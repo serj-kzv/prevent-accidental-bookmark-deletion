@@ -1,0 +1,56 @@
+{
+  "manifest_version": 2,
+  "name": "simple-maximize-windows-on-start-up",
+  "version": "4",
+  "description": "Maximizes windows on start up.",
+  "author": "serj-kzv",
+  "homepage_url": "https://github.com/serj-kzv/simple-maximize-windows-on-start-up",
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "browser_action": {
+    "default_icon": "icon.svg"
+  },
+  "permissions": [
+    "<all_urls>",
+    "activeTab",
+    "alarms",
+    "bookmarks",
+    "browserSettings",
+    "browsingData",
+    "captivePortal",
+    "clipboardRead",
+    "clipboardWrite",
+    "contextMenus",
+    "contextualIdentities",
+    "cookies",
+    "dns",
+    "downloads",
+    "downloads.open",
+    "find",
+    "geolocation",
+    "history",
+    "identity",
+    "idle",
+    "management",
+    "menus",
+    "nativeMessaging",
+    "notifications",
+    "pkcs11",
+    "privacy",
+    "proxy",
+    "search",
+    "sessions",
+    "storage",
+    "tabHide",
+    "tabs",
+    "theme",
+    "topSites",
+    "unlimitedStorage",
+    "webNavigation",
+    "webRequest",
+    "webRequestBlocking"
+  ]
+}
