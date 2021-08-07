@@ -11,7 +11,6 @@ class LocalBookmarkStorage {
     }
 
     async #init() {
-        this.#memoryStorage = undefined;
         await browser.storage.set({bookmarkTitles: {}});
     }
 

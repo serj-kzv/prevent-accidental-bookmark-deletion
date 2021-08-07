@@ -1,10 +1,6 @@
 class AbstractBookmarkStorage {
     static #ERR_MSG = 'The method has to be implemented!';
 
-    async init() {
-        throw AbstractBookmarkStorage.#ERR_MSG;
-    }
-
     async getById(id) {
         throw AbstractBookmarkStorage.#ERR_MSG;
     }

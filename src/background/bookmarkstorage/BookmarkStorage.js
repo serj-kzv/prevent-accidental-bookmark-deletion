@@ -1,34 +1,32 @@
-import BookmarkStorageMode from "./BookmarkStorageMode";
-import MemoryBookmarkStorage from "./MemoryBookmarkStorage";
-import LocalBookmarkStorage from "./LocalBookmarkStorage";
-import AbstractBookmarkStorage from "./AbstractBookmarkStorage";
+import BookmarkStorageMode from "./BookmarkStorageMode.js";
+import MemoryBookmarkStorage from "./MemoryBookmarkStorage.js";
+import LocalBookmarkStorage from "./LocalBookmarkStorage.js";
+import AbstractBookmarkStorage from "./AbstractBookmarkStorage.js";
 
 class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
     #storage;
-    #onCreatedFn = async ({id, info}) => {
+    #onCreatedFn = async (id, info) => {
+        console.debug('Will be added to storage', info);
         await this.save(id, info.title);
     };
-    #onChangedFn = async ({id, info}) => {
+    #onChangedFn = async (id, info) => {
+        console.debug('Will be added to storage', info);
         await this.save(id, info.title);
-    };
-    #onRemovedFn = async ({id, info}) => {
-        await this.delete(id, info.title);
     };
 
     static async build() {
         const bookmarkStorage = new BookmarkStorage();
 
-        await bookmarkStorage.init();
+        await bookmarkStorage.#init();
 
         return bookmarkStorage;
     }
 
-    async init() {
+    async #init() {
         await this.activateMemoryStorageMode();
         browser.bookmarks.onCreated.addListener(this.#onCreatedFn);
         browser.bookmarks.onChanged.addListener(this.#onChangedFn);
-        browser.bookmarks.onRemoved.addListener(this.#onRemovedFn);
     }
 
     async getById(id) {
@@ -45,21 +43,22 @@ class BookmarkStorage extends AbstractBookmarkStorage {
 
     async activateLocalStorageMode() {
         await this.destroy();
-        await this.#storage = await LocalBookmarkStorage.build();
+        this.#storage = await LocalBookmarkStorage.build();
         this.#mode = BookmarkStorageMode.LOCAL_STORAGE;
     }
 
     async activateMemoryStorageMode() {
         await this.destroy();
-        await this.#storage = await MemoryBookmarkStorage.build();
+        this.#storage = await MemoryBookmarkStorage.build();
         this.#mode = BookmarkStorageMode.MEMORY_STORAGE;
     }
 
     async destroy() {
         browser.bookmarks.onCreated.removeListener(this.#onCreatedFn);
         browser.bookmarks.onChanged.removeListener(this.#onChangedFn);
-        browser.bookmarks.onRemoved.removeListener(this.#onRemovedFn);
-        await this.#storage.destroy();
+        if (this.#storage) {
+            await this.#storage.destroy();
+        }
         this.#mode = undefined;
     }
 

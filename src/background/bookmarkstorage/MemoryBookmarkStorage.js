@@ -13,6 +13,7 @@ class MemoryBookmarkStorage {
         this.#memoryStorage = new Map();
         (await browser.bookmarks.search({}))
             .forEach(({id, title}) => this.#memoryStorage.set(id, title));
+        console.debug('init storage state is', this.#memoryStorage);
     }
 
     async getById(id) {
