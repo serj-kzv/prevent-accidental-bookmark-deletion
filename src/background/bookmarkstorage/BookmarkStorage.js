@@ -1,8 +1,9 @@
 import BookmarkStorageMode from "./BookmarkStorageMode";
 import MemoryBookmarkStorage from "./MemoryBookmarkStorage";
 import LocalBookmarkStorage from "./LocalBookmarkStorage";
+import AbstractBookmarkStorage from "./AbstractBookmarkStorage";
 
-class BookmarkStorage {
+class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
     #storage;
 
@@ -18,8 +19,12 @@ class BookmarkStorage {
         await this.activateMemoryStorageMode();
     }
 
-    getById(id) {
-        this.#storage.getById(id);
+    async getById(id) {
+        return await this.#storage.getById(id);
+    }
+
+    async save(id, title) {
+        return this.#storage.save(id, title);
     }
 
     async activateLocalStorageMode() {
@@ -29,7 +34,7 @@ class BookmarkStorage {
     }
 
     async activateMemoryStorageMode() {
-        await this.#storage.destroy();
+        await this.destroy();
         await this.#storage = await MemoryBookmarkStorage.build();
         this.#mode = BookmarkStorageMode.MEMORY_STORAGE;
     }
