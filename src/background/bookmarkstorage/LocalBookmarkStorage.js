@@ -14,7 +14,7 @@ class LocalBookmarkStorage {
         await browser.storage.set({bookmarkTitles: {}});
     }
 
-    get(id) {
+    async get(id) {
         return browser.storage.get(id);
     }
 
