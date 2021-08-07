@@ -2,16 +2,17 @@ import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
 
 class PreventBookmarkRemoval {
     #storage;
-    #onRemovedListener = async (id, {node}) => {
+    #onRemovedListener = async (id, {index, node}) => {
         console.debug('Recreation is started.');
         console.debug('id', id);
         console.debug('node', node);
 
         console.debug('this.#storage', this.#storage);
-        const {index, parentId, type, url} = node;
+        const {parentId, type, url} = node;
         console.debug('this.#storage', this.#storage);
         const title = await this.#storage.get(id);
 
+        console.debug('index', index);
         console.debug('title', title);
 
         await browser.bookmarks.create({

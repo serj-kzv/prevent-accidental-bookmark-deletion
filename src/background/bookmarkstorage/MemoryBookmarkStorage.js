@@ -17,7 +17,6 @@ class MemoryBookmarkStorage {
     }
 
     async get(id) {
-        console.debug('getById id ', id);
         return this.#memoryStorage.get(id);
     }
 
