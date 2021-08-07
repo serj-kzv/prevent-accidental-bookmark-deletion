@@ -23,6 +23,10 @@ class MemoryBookmarkStorage {
         return this.#memoryStorage.set(id, title);
     }
 
+    async delete(id) {
+        return this.#memoryStorage.delete(id);
+    }
+
     async destroy() {
         this.#memoryStorage = undefined;
     }

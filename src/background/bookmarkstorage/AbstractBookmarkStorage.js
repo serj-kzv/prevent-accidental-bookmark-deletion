@@ -13,6 +13,10 @@ class AbstractBookmarkStorage {
         throw AbstractBookmarkStorage.#ERR_MSG;
     }
 
+    async delete(id) {
+        throw AbstractBookmarkStorage.#ERR_MSG;
+    }
+
     async destroy() {
         throw AbstractBookmarkStorage.#ERR_MSG;
     }
