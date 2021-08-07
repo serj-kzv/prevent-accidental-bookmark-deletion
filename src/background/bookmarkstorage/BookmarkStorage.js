@@ -3,6 +3,16 @@ import MemoryBookmarkStorage from "./MemoryBookmarkStorage";
 import LocalBookmarkStorage from "./LocalBookmarkStorage";
 import AbstractBookmarkStorage from "./AbstractBookmarkStorage";
 
+const onCreatedFn = async ({id, bookmarkInfo}) => {
+
+};
+const onChangedFn = async ({id, changeInfo}) => {
+
+};
+const onRemovedFn = async ({id, removeInfo}) => {
+
+};
+
 class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
     #storage;
@@ -17,6 +27,9 @@ class BookmarkStorage extends AbstractBookmarkStorage {
 
     async init() {
         await this.activateMemoryStorageMode();
+        browser.bookmarks.onCreated.addListener(onCreatedFn);
+        browser.bookmarks.onChanged.addListener(onChangedFn)
+        browser.bookmarks.onRemoved.addListener(onRemovedFn)
     }
 
     async getById(id) {
@@ -40,6 +53,9 @@ class BookmarkStorage extends AbstractBookmarkStorage {
     }
 
     async destroy() {
+        browser.bookmarks.onCreated.removeListener(onCreatedFn);
+        browser.bookmarks.onChanged.removeListener(onChangedFn)
+        browser.bookmarks.onRemoved.removeListener(onRemovedFn)
         await this.#storage.destroy();
         this.#mode = undefined;
     }
