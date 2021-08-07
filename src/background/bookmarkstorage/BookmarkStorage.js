@@ -6,11 +6,11 @@ import AbstractBookmarkStorage from "./AbstractBookmarkStorage.js";
 class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
     #storage;
-    #onCreatedFn = async (id, info) => {
+    #onCreatedListener = async (id, info) => {
         console.debug('Will be added to storage', info);
         await this.save(id, info.title);
     };
-    #onChangedFn = async (id, info) => {
+    #onChangedListener = async (id, info) => {
         console.debug('Will be added to storage', info);
         await this.save(id, info.title);
     };
@@ -25,12 +25,12 @@ class BookmarkStorage extends AbstractBookmarkStorage {
 
     async #init() {
         await this.activateMemoryStorageMode();
-        browser.bookmarks.onCreated.addListener(this.#onCreatedFn);
-        browser.bookmarks.onChanged.addListener(this.#onChangedFn);
+        browser.bookmarks.onCreated.addListener(this.#onCreatedListener);
+        browser.bookmarks.onChanged.addListener(this.#onChangedListener);
     }
 
-    async getById(id) {
-        return await this.#storage.getById(id);
+    async get(id) {
+        return await this.#storage.get(id);
     }
 
     async save(id, title) {
@@ -54,8 +54,8 @@ class BookmarkStorage extends AbstractBookmarkStorage {
     }
 
     async destroy() {
-        browser.bookmarks.onCreated.removeListener(this.#onCreatedFn);
-        browser.bookmarks.onChanged.removeListener(this.#onChangedFn);
+        browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
+        browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
         if (this.#storage) {
             await this.#storage.destroy();
         }

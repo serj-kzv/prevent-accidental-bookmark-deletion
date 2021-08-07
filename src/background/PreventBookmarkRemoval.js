@@ -2,6 +2,27 @@ import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
 
 class PreventBookmarkRemoval {
     #storage;
+    #onRemovedListener = async (id, {node}) => {
+        console.debug('Recreation is started.');
+        console.debug('id', id);
+        console.debug('node', node);
+
+        console.debug('this.#storage', this.#storage);
+        const {index, parentId, type, url} = node;
+        console.debug('this.#storage', this.#storage);
+        const title = await this.#storage.get(id);
+
+        console.debug('title', title);
+
+        await browser.bookmarks.create({
+            index,
+            parentId,
+            type,
+            url,
+            title
+        });
+        await this.#storage.delete(id);
+    };
 
     static async build() {
         const command = new PreventBookmarkRemoval();
@@ -16,26 +37,6 @@ class PreventBookmarkRemoval {
         this.#storage = await BookmarkStorage.build();
         browser.bookmarks.onRemoved.addListener(this.#onRemovedListener);
     }
-
-    async #onRemovedListener(id, {node}) {
-        console.debug('Recreation is started.');
-        console.debug('id', id);
-        console.debug('node', node);
-
-        const {index, parentId, type, url} = node;
-        const title = await this.#storage.getById(id);
-
-        console.debug('title', title);
-
-        await browser.bookmarks.create({
-            index,
-            parentId,
-            type,
-            url,
-            title
-        });
-        await this.#storage.delete(id);
-    };
 
     async destroy() {
         browser.bookmarks.onRemoved.removeListener(this.#onRemovedListener);
