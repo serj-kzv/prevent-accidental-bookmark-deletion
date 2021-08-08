@@ -13,6 +13,7 @@ class PreventBookmarkRemoval {
         console.debug('index', index);
         console.debug('title', title);
 
+        await this.#storage.delete(id);
         await browser.bookmarks.create({
             index,
             parentId,
@@ -20,7 +21,6 @@ class PreventBookmarkRemoval {
             url,
             title
         });
-        await this.#storage.delete(id);
     };
 
     static async build() {
