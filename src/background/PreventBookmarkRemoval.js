@@ -7,9 +7,7 @@ class PreventBookmarkRemoval {
         console.debug('id', id);
         console.debug('node', node);
 
-        console.debug('this.#storage', this.#storage);
         const {parentId, type, url} = node;
-        console.debug('this.#storage', this.#storage);
         const title = await this.#storage.get(id);
 
         console.debug('index', index);
