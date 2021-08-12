@@ -5,18 +5,16 @@ class BookmarkCreator {
 
     async create(index, bookmark) {
         const {parentId, type, url, title} = bookmark;
-
-        await this.#execQueueIfParentFound(type, bookmark);
-
         const parentBookmark = await browser.bookmarks.get(parentId);
+        const createCallbackFn = () => this.#execQueueIfParentFound(type, bookmark);
 
         if (parentBookmark.length < 1) {
-            this.#createInQueue(index, parentId, type, url, title);
+            this.#createInQueue(index, parentId, type, url, title, createCallbackFn);
         } else {
             try {
-                await this.#create(index, parentId, type, url, title);
+                await this.#create(index, parentId, type, url, title, createCallbackFn);
             } catch (ex) {
-                this.#createInQueue(index, parentId, type, url, title);
+                this.#createInQueue(index, parentId, type, url, title, createCallbackFn);
             }
         }
     }
@@ -50,17 +48,18 @@ class BookmarkCreator {
         }
     }
 
-    #create(index, parentId, type, url, title) {
-        return browser.bookmarks.create({
+    #create(index, parentId, type, url, title, callbackFn = () => {}) {
+        browser.bookmarks.create({
             index,
             parentId,
             type,
             url,
             title
         });
+        callbackFn();
     }
 
-    #createInQueue(index, parentId, type, url, title) {
+    #createInQueue(index, parentId, type, url, title, callbackFn = () => {}) {
         this.#createOrGetQueue(parentId).push(async () => {
             try {
                 await browser.bookmarks.create({
@@ -70,6 +69,7 @@ class BookmarkCreator {
                     url,
                     title
                 });
+                callbackFn();
             } catch (e) {
                 console.error('parent folder will be deleted during its bookmark children recreating?', e);
                 // what if parent folder will be deleted during its bookmark children recreating?
