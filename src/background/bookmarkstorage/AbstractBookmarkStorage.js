@@ -5,7 +5,7 @@ class AbstractBookmarkStorage {
         throw AbstractBookmarkStorage.#ERR_MSG;
     }
 
-    async save(id, title) {
+    async save(id, bookmark) {
         throw AbstractBookmarkStorage.#ERR_MSG;
     }
 

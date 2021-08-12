@@ -6,13 +6,13 @@ import MemoryBookmarkStorage from "./MemoryBookmarkStorage.js";
 class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
     #storage;
-    #onCreatedListener = async (id, info) => {
-        console.debug('Will be added to storage', info);
-        await this.save(id, info.title);
+    #onCreatedListener = async (id, bookmark) => {
+        console.debug('Will be added to storage', bookmark);
+        await this.save(id, ibookmark);
     };
-    #onChangedListener = async (id, info) => {
-        console.debug('Will be added to storage', info);
-        await this.save(id, info.title);
+    #onChangedListener = async (id, bookmark) => {
+        console.debug('Will be added to storage', bookmark);
+        await this.save(id, bookmark);
     };
 
     static async build() {
@@ -33,8 +33,8 @@ class BookmarkStorage extends AbstractBookmarkStorage {
         return await this.#storage.get(id);
     }
 
-    async save(id, title) {
-        return await this.#storage.save(id, title);
+    async save(id, bookmark) {
+        return await this.#storage.save(id, bookmark);
     }
 
     async delete(id) {
@@ -56,6 +56,8 @@ class BookmarkStorage extends AbstractBookmarkStorage {
     async destroy() {
         browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
         browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
+        this.#onCreatedListener = undefined;
+        this.#onChangedListener = undefined;
         if (this.#storage) {
             await this.#storage.destroy();
         }

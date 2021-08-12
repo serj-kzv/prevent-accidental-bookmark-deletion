@@ -1,5 +1,9 @@
 import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
 
+class BookmarkProducerQueue {
+    push
+}
+
 class PreventBookmarkRemoval {
     #storage;
     #onRemovedListener = async (id, {index, node}) => {
@@ -8,10 +12,11 @@ class PreventBookmarkRemoval {
         console.debug('node', node);
 
         const {parentId, type, url} = node;
-        const title = await this.#storage.get(id);
+        const bookmark = await this.#storage.get(id);
+        const {title} = bookmark;
 
         console.debug('index', index);
-        console.debug('title', title);
+        console.debug('bookmark', bookmark);
 
         await this.#storage.delete(id);
         await browser.bookmarks.create({
@@ -39,6 +44,8 @@ class PreventBookmarkRemoval {
 
     async destroy() {
         browser.bookmarks.onRemoved.removeListener(this.#onRemovedListener);
+        this.#onRemovedListener = undefined;
+        this.#storage = undefined;
     }
 }
 
