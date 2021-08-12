@@ -6,39 +6,54 @@ class BookmarkCreator {
     async create(index, bookmark) {
         const {parentId, type, url, title} = bookmark;
 
-        await this.#execQueueIfFound(type, bookmark);
+        await this.#execQueueIfParentFound(type, bookmark);
 
         const parentBookmark = await browser.bookmarks.get(parentId);
 
         if (parentBookmark.length < 1) {
-            this.#pushToQueue(index, parentId, type, url, title);
+            this.#createInQueue(index, parentId, type, url, title);
         } else {
             try {
-                await browser.bookmarks.create({
-                    index,
-                    parentId,
-                    type,
-                    url,
-                    title
-                });
+                await this.#create(index, parentId, type, url, title);
             } catch (ex) {
-                this.#pushToQueue(index, parentId, type, url, title);
+                this.#createInQueue(index, parentId, type, url, title);
             }
         }
     }
 
-    async #execQueueIfFound(type, bookmark) {
+    async #execQueueIfParentFound(type, bookmark) {
         if (type === BookmarkTypeEnum.FOLDER) {
             const {id} = bookmark;
             const queue = this.#queues.get(id);
 
             if (queue) {
-                await Promise.allSettled(queue);
+                const queueToExec = [...queue];
+
+                await Promise.allSettled(queueToExec);
+
+                // double check if parallel listener added a create task
+                if (queueToExec.length !== queue.length) {
+                    const queueToExecDiff = queue
+                        .filter(createFn => !queueToExec.includes(createFn))
+                        .map(createFn => createFn());
+
+                    await Promise.allSettled(queueToExecDiff);
+                }
             }
         }
     }
 
-    #pushToQueue(index, parentId, type, url, title) {
+    #create(index, parentId, type, url, title) {
+        return browser.bookmarks.create({
+            index,
+            parentId,
+            type,
+            url,
+            title
+        });
+    }
+
+    #createInQueue(index, parentId, type, url, title) {
         this.#createOrGetQueue(parentId).push(async () => await browser.bookmarks.create({
             index,
             parentId,
