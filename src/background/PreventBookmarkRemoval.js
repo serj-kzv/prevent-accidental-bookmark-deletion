@@ -1,20 +1,5 @@
+import BookmarkCreator from "./BookmarkCreator.js";
 import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
-
-class BookmarkCreator {
-    #queue;
-
-    async create(index, bookmark) {
-        const {parentId, type, url, title} = bookmark;
-
-        await browser.bookmarks.create({
-            index,
-            parentId,
-            type,
-            url,
-            title
-        });
-    }
-}
 
 class PreventBookmarkRemoval {
     #storage;
