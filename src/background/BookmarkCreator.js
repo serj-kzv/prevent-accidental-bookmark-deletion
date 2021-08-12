@@ -65,6 +65,7 @@ class BookmarkCreator {
                     title
                 });
             } catch (e) {
+                console.error('parent folder will be deleted during its bookmark children recreating?', e);
                 // what if parent folder will be deleted during its bookmark children recreating?
             }
         });
