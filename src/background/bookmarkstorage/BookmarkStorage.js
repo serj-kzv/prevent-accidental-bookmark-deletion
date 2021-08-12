@@ -6,14 +6,8 @@ import MemoryBookmarkStorage from "./MemoryBookmarkStorage.js";
 class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
     #storage;
-    #onCreatedListener = async (id, bookmark) => {
-        console.debug('Will be added to storage', bookmark);
-        await this.save(id, ibookmark);
-    };
-    #onChangedListener = async (id, bookmark) => {
-        console.debug('Will be added to storage', bookmark);
-        await this.save(id, bookmark);
-    };
+    #onCreatedListener;
+    #onChangedListener;
 
     static async build() {
         const bookmarkStorage = new BookmarkStorage();
@@ -25,6 +19,14 @@ class BookmarkStorage extends AbstractBookmarkStorage {
 
     async #init() {
         await this.activateMemoryStorageMode();
+        this.#onCreatedListener = async (id, bookmark) => {
+            console.debug('Will be added to storage', bookmark);
+            await this.save(id, bookmark);
+        };
+        this.#onChangedListener = async (id, bookmark) => {
+            console.debug('Will be added to storage', bookmark);
+            await this.save(id, bookmark);
+        };
         browser.bookmarks.onCreated.addListener(this.#onCreatedListener);
         browser.bookmarks.onChanged.addListener(this.#onChangedListener);
     }
@@ -54,13 +56,18 @@ class BookmarkStorage extends AbstractBookmarkStorage {
     }
 
     async destroy() {
-        browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
-        browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
+        if (this.#onCreatedListener) {
+            browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
+        }
+        if (this.#onChangedListener) {
+            browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
+        }
         this.#onCreatedListener = undefined;
         this.#onChangedListener = undefined;
         if (this.#storage) {
             await this.#storage.destroy();
         }
+        this.#storage = undefined;
         this.#mode = undefined;
     }
 
