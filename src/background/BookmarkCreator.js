@@ -23,10 +23,12 @@ class BookmarkCreator {
 
     async #execQueueIfParentFound(type, bookmark) {
         if (type === BookmarkTypeEnum.FOLDER) {
+            console.debug('execQueueIfParentFound starts');
             const {id} = bookmark;
             const queue = this.#queues.get(id);
 
             if (queue) {
+                console.debug('execQueueIfParentFound, queue will exec', queue);
                 const queueToExec = [...queue];
 
                 await Promise.allSettled(queueToExec);
@@ -37,7 +39,11 @@ class BookmarkCreator {
                         .filter(createFn => !queueToExec.includes(createFn))
                         .map(createFn => createFn());
 
+                    console.debug('execQueueIfParentFound, queueToExec will exec', queue);
+
                     await Promise.allSettled(queueToExecDiff);
+                } else {
+                    console.debug('execQueueIfParentFound, queueToExec will not exec', queue);
                 }
                 this.#queues.delete(id);
             }
