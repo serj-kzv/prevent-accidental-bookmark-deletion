@@ -3,3 +3,5 @@ class BookmarkTypeEnum {
     static FOLDER = 'folder';
     static NONE = '';
 }
+
+export default BookmarkTypeEnum;

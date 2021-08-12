@@ -1,3 +1,5 @@
+import BookmarkTypeEnum from "./BookmarkTypeEnum.js";
+
 class BookmarkCreator {
     #queues = new Map();
 
@@ -6,7 +8,7 @@ class BookmarkCreator {
 
         await this.#execQueueIfFound(type, bookmark);
 
-        const parentBookmark = await browser.bookmarks.search({id: parentId});
+        const parentBookmark = await browser.bookmarks.get(parentId);
 
         if (parentBookmark.length < 1) {
             this.#pushToQueue(index, parentId, type, url, title);
