@@ -39,6 +39,7 @@ class BookmarkCreator {
 
                     await Promise.allSettled(queueToExecDiff);
                 }
+                this.#queues.delete(id);
             }
         }
     }
@@ -54,13 +55,19 @@ class BookmarkCreator {
     }
 
     #createInQueue(index, parentId, type, url, title) {
-        this.#createOrGetQueue(parentId).push(async () => await browser.bookmarks.create({
-            index,
-            parentId,
-            type,
-            url,
-            title
-        }));
+        this.#createOrGetQueue(parentId).push(async () => {
+            try {
+                await browser.bookmarks.create({
+                    index,
+                    parentId,
+                    type,
+                    url,
+                    title
+                });
+            } catch (e) {
+                // what if parent folder will be deleted during its bookmark children recreating?
+            }
+        });
     }
 
     #createOrGetQueue(id) {
