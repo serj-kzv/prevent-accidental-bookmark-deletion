@@ -1,5 +1,6 @@
 class NAryTree {
     #children = [];
+    #value;
 
     add(node, index = this.#children.length) {
         this.#children.splice(index, 0, node);
@@ -12,13 +13,23 @@ class NAryTree {
 
         if (index > -1) {
             this.#children.splice(index, 1);
+
+            return true;
+        } else if (this.#children.length > 0) {
+            for (let i = 0; !node; i++) {
+                const isRemoved = this.#children[i].remove(node);
+
+                if (isRemoved) {
+                    return isRemoved;
+                }
+            }
         }
 
-        return this;
+        return false;
     }
 
     find(property, value) {
-        let node = this.#children.find(child => child[property] === value);
+        let node = this.#children.find(child => child.#value[property] === value);
 
         if (this.#children.length > 0) {
             for (let i = 0; !node; i++) {
@@ -27,6 +38,14 @@ class NAryTree {
         }
 
         return node;
+    }
+
+    getValue() {
+        return this.#value;
+    }
+
+    setValue(value) {
+        this.#value = value;
     }
 }
 
