@@ -40,6 +40,29 @@ class NAryTree {
         return node;
     }
 
+    static applyRecursive(node, fn = node => {}) {
+        fn(node);
+        NAryTree.applyToChildrenRecursive(node, fn);
+    }
+
+    static applyToChildrenRecursive(node, fn = node => {}) {
+        const children = node.getChildren();
+        const length = children.length;
+
+        if (length > 0) {
+            for (let i = 0; i < length; i++) {
+                const child = children[i];
+
+                fn(child);
+                NAryTree.applyToChildrenRecursive(child, fn);
+            }
+        }
+    }
+
+    getChildren() {
+        return this.#children;
+    }
+
     getValue() {
         return this.#value;
     }
