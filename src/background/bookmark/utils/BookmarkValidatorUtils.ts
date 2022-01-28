@@ -1,5 +1,5 @@
-import {Bookmark} from "./Bookmark";
-import {BookmarkQuery} from "./BookmarkQuery";
+import {Bookmark} from "../model/Bookmark";
+import {BookmarkQuery} from "../model/BookmarkQuery";
 
 export class BookmarkValidatorUtils {
 

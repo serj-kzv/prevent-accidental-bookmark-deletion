@@ -1,5 +1,5 @@
 import * as PouchDB from "pouchdb";
-import {Bookmark} from "./Bookmark";
+import {Bookmark} from "../model/Bookmark";
 import PouchDBFind from "pouchdb-find";
 
 PouchDB.plugin(PouchDBFind);

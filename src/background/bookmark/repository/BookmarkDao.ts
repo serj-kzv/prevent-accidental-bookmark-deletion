@@ -1,18 +1,16 @@
-import {BookmarkQuery} from "./BookmarkQuery";
-import {BookmarkValidatorUtils} from "./BookmarkValidatorUtils";
-import {Bookmark} from "./Bookmark";
+import {BookmarkQuery} from "../model/BookmarkQuery";
+import {BookmarkValidatorUtils} from "../utils/BookmarkValidatorUtils";
+import {Bookmark} from "../model/Bookmark";
 import bookmarkDataSource from "./BookmarkDataSource";
 
 export class BookmarkDao {
 
-    constructor(
-    ) {
-    }
-
     async save(bookmark: Bookmark): Promise<Bookmark> {
+        console.debug('BookmarkDao save', bookmark);
+
         BookmarkValidatorUtils.validateHasId(bookmark);
 
-        const foundBookmark: Bookmark = await this.findById(bookmark.getId());
+        const foundBookmark: Bookmark = await this.findById(bookmark.id);
 
         if (foundBookmark) {
             throw new Error('Already exists');
@@ -45,6 +43,8 @@ export class BookmarkDao {
     }
 
     async find(query: BookmarkQuery): Promise<Bookmark[]> {
+        console.debug('BookmarkDao find', query);
+
         return (await bookmarkDataSource.db.find({selector: query})).docs;
     }
 
@@ -68,6 +68,8 @@ export class BookmarkDao {
     }
 
     async delete(query: BookmarkQuery): Promise<void> {
+        console.debug('BookmarkDao delete', query);
+
         await Promise.allSettled((await this.find(query))
             .map(async bookmark => await bookmarkDataSource.db.remove(await bookmarkDataSource.db.get(bookmark.id))));
     }
