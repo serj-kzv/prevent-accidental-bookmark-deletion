@@ -16,9 +16,7 @@ export class CreateBookmarkHandler implements Handler {
     }
 
     public async init(): Promise<void> {
-        this.handle = async (id: string, bookmarkInfo: any) => {
-            const bookmark: Bookmark = bookmarkInfo as Bookmark;
-
+        this.handle = async (id: string, bookmark: Bookmark) => {
             await bookmarkDao.save(bookmark);
         }
     }

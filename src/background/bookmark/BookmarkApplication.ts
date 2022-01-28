@@ -1,6 +1,6 @@
 import bookmarkDao from "./repository/BookmarkDao";
 import {CreateBookmarkHandler} from "./handler/CreateBookmarkHandler";
-import {DeleteBookmarkHandler} from "./handler/DeleteBookmarkHandler";
+import {RemoveBookmarkHandler} from "./handler/RemoveBookmarkHandler";
 import {ChangeBookmarkHandler} from "./handler/ChangeBookmarkHandler";
 import bookmarkApi from "./service/BookmarkApi";
 import {MoveBookmarkHandler} from "./handler/MoveBookmarkHandler";
@@ -16,7 +16,7 @@ export class BookmarkApplication {
         (await CreateBookmarkHandler.build()).start();
         (await ChangeBookmarkHandler.build()).start();
         (await MoveBookmarkHandler.build()).start();
-        (await DeleteBookmarkHandler.build()).start();
+        (await RemoveBookmarkHandler.build()).start();
     }
 
 }

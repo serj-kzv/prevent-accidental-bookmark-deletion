@@ -1,6 +1,7 @@
 import {Handler} from "./base/Handler";
 import {Bookmark} from "../model/Bookmark";
 import bookmarkDao from "../repository/BookmarkDao";
+import BookmarkChangeInfo from "../model/BookmarkChangeInfo";
 
 export class ChangeBookmarkHandler implements Handler {
 
@@ -16,8 +17,11 @@ export class ChangeBookmarkHandler implements Handler {
     }
 
     public async init(): Promise<void> {
-        this.handle = async (id: string, bookmarkInfo: any) => {
-            const bookmark: Bookmark = bookmarkInfo as Bookmark;
+        this.handle = async (id: string, bookmarkInfo: BookmarkChangeInfo) => {
+            const bookmark: Bookmark = await bookmarkDao.findById(id);
+
+            bookmark.title = bookmarkInfo.title;
+            bookmark.url = bookmarkInfo.url;
 
             await bookmarkDao.save(bookmark);
         }

@@ -1,13 +1,14 @@
 import {Handler} from "./base/Handler";
 import bookmarkDao from "../repository/BookmarkDao";
+import BookmarkRemoveInfo from "../model/BookmarkRemoveInfo";
 
-export class DeleteBookmarkHandler implements Handler {
+export class RemoveBookmarkHandler implements Handler {
 
     private constructor(private handle: any = null) {
     }
 
     public static async build() {
-        const deleteBookmarkHandler: DeleteBookmarkHandler = new DeleteBookmarkHandler();
+        const deleteBookmarkHandler: RemoveBookmarkHandler = new RemoveBookmarkHandler();
 
         await deleteBookmarkHandler.init();
 
@@ -15,7 +16,7 @@ export class DeleteBookmarkHandler implements Handler {
     }
 
     public async init(): Promise<void> {
-        this.handle = async (id: string, removeInfo: any) => {
+        this.handle = async (id: string, removeInfo: BookmarkRemoveInfo) => {
 
             await bookmarkDao.findAllChildrenByParentId(id);
         }
