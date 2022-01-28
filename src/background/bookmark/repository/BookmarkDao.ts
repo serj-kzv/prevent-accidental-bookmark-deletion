@@ -75,6 +75,10 @@ class BookmarkDao {
         return this.findOne(new BookmarkQuery(id));
     }
 
+    async findAllChildrenByParentId(id: string): Promise<Bookmark[]> {
+        return await this.find(new BookmarkQuery(undefined, id));
+    }
+
     async delete(query: BookmarkQuery): Promise<void> {
         console.debug('BookmarkDao delete', query);
 

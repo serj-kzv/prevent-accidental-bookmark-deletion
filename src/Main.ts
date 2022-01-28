@@ -2,8 +2,8 @@ import {BookmarkApplication} from "./background/bookmark/BookmarkApplication";
 
 class Main {
     public async run() {
-        console.log('run');
-        new BookmarkApplication().run();
+        console.debug('Main run');
+        await new BookmarkApplication().run();
     }
 }
 

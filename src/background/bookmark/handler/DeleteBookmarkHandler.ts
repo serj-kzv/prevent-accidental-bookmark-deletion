@@ -1,18 +1,32 @@
 import {Handler} from "./base/Handler";
+import bookmarkDao from "../repository/BookmarkDao";
 
 export class DeleteBookmarkHandler implements Handler {
 
-    constructor(private handle: any = null) {
-        this.init();
+    private constructor(private handle: any = null) {
     }
 
-    init(): void {
+    public static async build() {
+        const deleteBookmarkHandler: DeleteBookmarkHandler = new DeleteBookmarkHandler();
+
+        await deleteBookmarkHandler.init();
+
+        return deleteBookmarkHandler;
     }
 
-    start(): void {
+    public async init(): Promise<void> {
+        this.handle = async (id: string, removeInfo: any) => {
+
+            await bookmarkDao.findAllChildrenByParentId(id);
+        }
     }
 
-    stop(): void {
+    public start(): void {
+        browser.bookmarks.onRemoved.addListener(this.handle);
+    }
+
+    public stop(): void {
+        browser.bookmarks.onRemoved.removeListener(this.handle);
     }
 
 }

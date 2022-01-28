@@ -12,9 +12,9 @@ export class BookmarkApplication {
 
     private async init(): Promise<void> {
         await bookmarkDao.saveAll(await bookmarkApi.getAll());
-        new CreateBookmarkHandler().start();
-        new UpdateBookmarkHandler().start();
-        new DeleteBookmarkHandler().start();
+        (await CreateBookmarkHandler.build()).start();
+        (await UpdateBookmarkHandler.build()).start();
+        (await DeleteBookmarkHandler.build()).start();
     }
 
 }

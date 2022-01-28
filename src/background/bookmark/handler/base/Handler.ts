@@ -1,5 +1,5 @@
 export interface Handler {
-    init(): void;
+    init(): Promise<void>;
     start(): void;
     stop(): void;
 }

@@ -4,11 +4,18 @@ import bookmarkDao from "../repository/BookmarkDao";
 
 export class UpdateBookmarkHandler implements Handler {
 
-    constructor(private handle: any = null) {
-        this.init();
+    private constructor(private handle: any = null) {
     }
 
-    public init(): void {
+    public static async build() {
+        const updateBookmarkHandler: UpdateBookmarkHandler = new UpdateBookmarkHandler();
+
+        await updateBookmarkHandler.init();
+
+        return updateBookmarkHandler;
+    }
+
+    public async init(): Promise<void> {
         this.handle = async (id: string, bookmarkInfo: any) => {
             const bookmark: Bookmark = bookmarkInfo as Bookmark;
 
