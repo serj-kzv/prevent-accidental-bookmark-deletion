@@ -17093,7 +17093,7 @@ var ChangeBookmarkHandler = /** @class */ (function () {
             var _this = this;
             return __generator(this, function (_a) {
                 this.handle = function (id, bookmarkInfo) { return __awaiter(_this, void 0, void 0, function () {
-                    var bookmark;
+                    var bookmark, title, url;
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0:
@@ -17101,8 +17101,14 @@ var ChangeBookmarkHandler = /** @class */ (function () {
                                 return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].findById(id)];
                             case 1:
                                 bookmark = _a.sent();
-                                bookmark.title = bookmarkInfo.title;
-                                bookmark.url = bookmarkInfo.url;
+                                title = bookmarkInfo.title;
+                                url = bookmarkInfo.url;
+                                if (title) {
+                                    bookmark.title = title;
+                                }
+                                if (url) {
+                                    bookmark.url = url;
+                                }
                                 return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].save(bookmark)];
                             case 2:
                                 _a.sent();
