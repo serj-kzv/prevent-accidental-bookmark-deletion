@@ -75,6 +75,13 @@ class BookmarkDao {
         return this.findOne(new BookmarkQuery(id));
     }
 
+    async findAll(): Promise<Bookmark[]> {
+        console.debug('BookmarkDao findAll');
+        const rows = (await bookmarkDataSource.db.allDocs({include_docs: true})).rows;
+
+        return rows.map(row => row.doc as Bookmark);
+    }
+
     async findAllChildrenByParentId(id: string): Promise<Bookmark[]> {
         return await this.find(new BookmarkQuery(undefined, id));
     }
