@@ -1,3 +1,5 @@
-export abstract class Handler {
-    
+export interface Handler {
+    start(): void;
+    stop(): void;
+    handle(): void;
 }

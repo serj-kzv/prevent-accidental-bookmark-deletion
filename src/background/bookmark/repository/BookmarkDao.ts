@@ -3,7 +3,7 @@ import {BookmarkValidatorUtils} from "../utils/BookmarkValidatorUtils";
 import {Bookmark} from "../model/Bookmark";
 import bookmarkDataSource from "./BookmarkDataSource";
 
-export class BookmarkDao {
+class BookmarkDao {
 
     async save(bookmark: Bookmark): Promise<Bookmark> {
         console.debug('BookmarkDao save', bookmark);
@@ -40,6 +40,14 @@ export class BookmarkDao {
         BookmarkValidatorUtils.validateBookmarkId(id);
 
         return this.saveChildByParentQuery(new BookmarkQuery(id), bookmark);
+    }
+
+    async saveAll(bookmarks: Bookmark[]): Promise<Bookmark[]> {
+        BookmarkValidatorUtils.validateHasIdAll(bookmarks);
+
+        await bookmarkDataSource.db.bulkDocs(bookmarks);
+
+        return bookmarks;
     }
 
     async find(query: BookmarkQuery): Promise<Bookmark[]> {
@@ -81,3 +89,7 @@ export class BookmarkDao {
     }
 
 }
+
+const bookmarkDao: BookmarkDao = new BookmarkDao();
+
+export default bookmarkDao;

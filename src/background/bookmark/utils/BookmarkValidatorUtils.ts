@@ -11,6 +11,10 @@ export class BookmarkValidatorUtils {
         throw Error('bookmark should has an id');
     }
 
+    public static validateHasIdAll(bookmarks: Bookmark[]): void {
+        bookmarks.forEach(bookmark => this.validateHasId(bookmark));
+    }
+
     public static validateHasNoId(bookmark: Bookmark): void {
         if (bookmark.id) {
             throw Error('bookmark should not has an id');

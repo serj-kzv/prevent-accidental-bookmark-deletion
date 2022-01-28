@@ -1,10 +1,9 @@
-import PreventBookmarkRemoval from "./background/PreventBookmarkRemoval";
+import {BookmarkApplication} from "./background/bookmark/BookmarkApplication";
 
 class Main {
     public async run() {
         console.log('run');
-
-        await PreventBookmarkRemoval.build();
+        new BookmarkApplication().run();
     }
 }
 
