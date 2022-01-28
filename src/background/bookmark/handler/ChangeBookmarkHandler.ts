@@ -2,13 +2,13 @@ import {Handler} from "./base/Handler";
 import {Bookmark} from "../model/Bookmark";
 import bookmarkDao from "../repository/BookmarkDao";
 
-export class UpdateBookmarkHandler implements Handler {
+export class ChangeBookmarkHandler implements Handler {
 
     private constructor(private handle: any = null) {
     }
 
     public static async build() {
-        const updateBookmarkHandler: UpdateBookmarkHandler = new UpdateBookmarkHandler();
+        const updateBookmarkHandler: ChangeBookmarkHandler = new ChangeBookmarkHandler();
 
         await updateBookmarkHandler.init();
 
