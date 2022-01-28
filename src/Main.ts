@@ -1,13 +1,10 @@
-import {Bookmark} from "./lib/bookmark/base/Bookmark";
-import {NTreeNode} from "./lib/NTreeNode";
+import PreventBookmarkRemoval from "./background/PreventBookmarkRemoval";
 
 class Main {
-    public run() {
+    public async run() {
         console.log('run');
 
-        let r = new NTreeNode<Bookmark>();
-
-        console.log(r);
+        await PreventBookmarkRemoval.build();
     }
 }
 
