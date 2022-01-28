@@ -1,6 +1,7 @@
 import {BookmarkType} from "./BookmarkType";
 
 export class BookmarkQuery {
+
     public constructor(
         public id?: string,
         public parentId?: string,
@@ -10,4 +11,5 @@ export class BookmarkQuery {
         public index?: number,
     ) {
     }
+
 }

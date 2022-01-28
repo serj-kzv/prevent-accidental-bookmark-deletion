@@ -1,4 +1,4 @@
-import {Handler} from "./Handler";
+import {Handler} from "./base/Handler";
 import {Bookmark} from "../model/Bookmark";
 import bookmarkDao from "../repository/BookmarkDao";
 
@@ -8,7 +8,7 @@ export class UpdateBookmarkHandler implements Handler {
         this.init();
     }
 
-    init(): void {
+    public init(): void {
         this.handle = async (id: string, bookmarkInfo: any) => {
             const bookmark: Bookmark = bookmarkInfo as Bookmark;
 
@@ -16,11 +16,11 @@ export class UpdateBookmarkHandler implements Handler {
         }
     }
 
-    start(): void {
+    public start(): void {
         browser.bookmarks.onChanged.addListener(this.handle);
     }
 
-    stop(): void {
+    public stop(): void {
         browser.bookmarks.onChanged.removeListener(this.handle);
     }
 
