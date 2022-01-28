@@ -4,11 +4,16 @@ import {RemoveBookmarkHandler} from "./handler/RemoveBookmarkHandler";
 import {ChangeBookmarkHandler} from "./handler/ChangeBookmarkHandler";
 import bookmarkApi from "./service/BookmarkApi";
 import {MoveBookmarkHandler} from "./handler/MoveBookmarkHandler";
+import bookmarkDataSource from "./repository/BookmarkDataSource";
 
 export class BookmarkApplication {
 
     public async run(): Promise<void> {
         console.debug('BookmarkApplication run');
+        console.debug('BookmarkApplication allDocs', await bookmarkDataSource.db.allDocs({
+            include_docs: true,
+            attachments: true
+        }));
         await this.init();
         console.debug('BookmarkApplication run inited');
     }
