@@ -17,12 +17,14 @@ export class RemoveBookmarkHandler implements Handler {
 
     public async init(): Promise<void> {
         this.handle = async (id: string, removeInfo: BookmarkRemoveInfo) => {
+            console.debug('RemoveBookmarkHandler handle', removeInfo);
 
             await bookmarkDao.findAllChildrenByParentId(id);
         }
     }
 
     public start(): void {
+        console.debug('RemoveBookmarkHandler start');
         browser.bookmarks.onRemoved.addListener(this.handle);
     }
 

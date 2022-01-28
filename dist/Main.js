@@ -2038,3836 +2038,9 @@ function typedBuffer() {
 
 /***/ }),
 
-/***/ "./node_modules/pouchdb-collate/lib/index.es.js":
+/***/ "./node_modules/pouchdb-browser/lib/index.es.js":
 /*!******************************************************!*\
-  !*** ./node_modules/pouchdb-collate/lib/index.es.js ***!
-  \******************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "collate": () => (/* binding */ collate),
-/* harmony export */   "normalizeKey": () => (/* binding */ normalizeKey),
-/* harmony export */   "toIndexableString": () => (/* binding */ toIndexableString),
-/* harmony export */   "parseIndexableString": () => (/* binding */ parseIndexableString)
-/* harmony export */ });
-function pad(str, padWith, upToLength) {
-  var padding = '';
-  var targetLength = upToLength - str.length;
-  /* istanbul ignore next */
-  while (padding.length < targetLength) {
-    padding += padWith;
-  }
-  return padding;
-}
-
-function padLeft(str, padWith, upToLength) {
-  var padding = pad(str, padWith, upToLength);
-  return padding + str;
-}
-
-var MIN_MAGNITUDE = -324; // verified by -Number.MIN_VALUE
-var MAGNITUDE_DIGITS = 3; // ditto
-var SEP = ''; // set to '_' for easier debugging 
-
-function collate(a, b) {
-
-  if (a === b) {
-    return 0;
-  }
-
-  a = normalizeKey(a);
-  b = normalizeKey(b);
-
-  var ai = collationIndex(a);
-  var bi = collationIndex(b);
-  if ((ai - bi) !== 0) {
-    return ai - bi;
-  }
-  switch (typeof a) {
-    case 'number':
-      return a - b;
-    case 'boolean':
-      return a < b ? -1 : 1;
-    case 'string':
-      return stringCollate(a, b);
-  }
-  return Array.isArray(a) ? arrayCollate(a, b) : objectCollate(a, b);
-}
-
-// couch considers null/NaN/Infinity/-Infinity === undefined,
-// for the purposes of mapreduce indexes. also, dates get stringified.
-function normalizeKey(key) {
-  switch (typeof key) {
-    case 'undefined':
-      return null;
-    case 'number':
-      if (key === Infinity || key === -Infinity || isNaN(key)) {
-        return null;
-      }
-      return key;
-    case 'object':
-      var origKey = key;
-      if (Array.isArray(key)) {
-        var len = key.length;
-        key = new Array(len);
-        for (var i = 0; i < len; i++) {
-          key[i] = normalizeKey(origKey[i]);
-        }
-      /* istanbul ignore next */
-      } else if (key instanceof Date) {
-        return key.toJSON();
-      } else if (key !== null) { // generic object
-        key = {};
-        for (var k in origKey) {
-          if (origKey.hasOwnProperty(k)) {
-            var val = origKey[k];
-            if (typeof val !== 'undefined') {
-              key[k] = normalizeKey(val);
-            }
-          }
-        }
-      }
-  }
-  return key;
-}
-
-function indexify(key) {
-  if (key !== null) {
-    switch (typeof key) {
-      case 'boolean':
-        return key ? 1 : 0;
-      case 'number':
-        return numToIndexableString(key);
-      case 'string':
-        // We've to be sure that key does not contain \u0000
-        // Do order-preserving replacements:
-        // 0 -> 1, 1
-        // 1 -> 1, 2
-        // 2 -> 2, 2
-        /* eslint-disable no-control-regex */
-        return key
-          .replace(/\u0002/g, '\u0002\u0002')
-          .replace(/\u0001/g, '\u0001\u0002')
-          .replace(/\u0000/g, '\u0001\u0001');
-        /* eslint-enable no-control-regex */
-      case 'object':
-        var isArray = Array.isArray(key);
-        var arr = isArray ? key : Object.keys(key);
-        var i = -1;
-        var len = arr.length;
-        var result = '';
-        if (isArray) {
-          while (++i < len) {
-            result += toIndexableString(arr[i]);
-          }
-        } else {
-          while (++i < len) {
-            var objKey = arr[i];
-            result += toIndexableString(objKey) +
-                toIndexableString(key[objKey]);
-          }
-        }
-        return result;
-    }
-  }
-  return '';
-}
-
-// convert the given key to a string that would be appropriate
-// for lexical sorting, e.g. within a database, where the
-// sorting is the same given by the collate() function.
-function toIndexableString(key) {
-  var zero = '\u0000';
-  key = normalizeKey(key);
-  return collationIndex(key) + SEP + indexify(key) + zero;
-}
-
-function parseNumber(str, i) {
-  var originalIdx = i;
-  var num;
-  var zero = str[i] === '1';
-  if (zero) {
-    num = 0;
-    i++;
-  } else {
-    var neg = str[i] === '0';
-    i++;
-    var numAsString = '';
-    var magAsString = str.substring(i, i + MAGNITUDE_DIGITS);
-    var magnitude = parseInt(magAsString, 10) + MIN_MAGNITUDE;
-    /* istanbul ignore next */
-    if (neg) {
-      magnitude = -magnitude;
-    }
-    i += MAGNITUDE_DIGITS;
-    while (true) {
-      var ch = str[i];
-      if (ch === '\u0000') {
-        break;
-      } else {
-        numAsString += ch;
-      }
-      i++;
-    }
-    numAsString = numAsString.split('.');
-    if (numAsString.length === 1) {
-      num = parseInt(numAsString, 10);
-    } else {
-      /* istanbul ignore next */
-      num = parseFloat(numAsString[0] + '.' + numAsString[1]);
-    }
-    /* istanbul ignore next */
-    if (neg) {
-      num = num - 10;
-    }
-    /* istanbul ignore next */
-    if (magnitude !== 0) {
-      // parseFloat is more reliable than pow due to rounding errors
-      // e.g. Number.MAX_VALUE would return Infinity if we did
-      // num * Math.pow(10, magnitude);
-      num = parseFloat(num + 'e' + magnitude);
-    }
-  }
-  return {num: num, length : i - originalIdx};
-}
-
-// move up the stack while parsing
-// this function moved outside of parseIndexableString for performance
-function pop(stack, metaStack) {
-  var obj = stack.pop();
-
-  if (metaStack.length) {
-    var lastMetaElement = metaStack[metaStack.length - 1];
-    if (obj === lastMetaElement.element) {
-      // popping a meta-element, e.g. an object whose value is another object
-      metaStack.pop();
-      lastMetaElement = metaStack[metaStack.length - 1];
-    }
-    var element = lastMetaElement.element;
-    var lastElementIndex = lastMetaElement.index;
-    if (Array.isArray(element)) {
-      element.push(obj);
-    } else if (lastElementIndex === stack.length - 2) { // obj with key+value
-      var key = stack.pop();
-      element[key] = obj;
-    } else {
-      stack.push(obj); // obj with key only
-    }
-  }
-}
-
-function parseIndexableString(str) {
-  var stack = [];
-  var metaStack = []; // stack for arrays and objects
-  var i = 0;
-
-  /*eslint no-constant-condition: ["error", { "checkLoops": false }]*/
-  while (true) {
-    var collationIndex = str[i++];
-    if (collationIndex === '\u0000') {
-      if (stack.length === 1) {
-        return stack.pop();
-      } else {
-        pop(stack, metaStack);
-        continue;
-      }
-    }
-    switch (collationIndex) {
-      case '1':
-        stack.push(null);
-        break;
-      case '2':
-        stack.push(str[i] === '1');
-        i++;
-        break;
-      case '3':
-        var parsedNum = parseNumber(str, i);
-        stack.push(parsedNum.num);
-        i += parsedNum.length;
-        break;
-      case '4':
-        var parsedStr = '';
-        /*eslint no-constant-condition: ["error", { "checkLoops": false }]*/
-        while (true) {
-          var ch = str[i];
-          if (ch === '\u0000') {
-            break;
-          }
-          parsedStr += ch;
-          i++;
-        }
-        // perform the reverse of the order-preserving replacement
-        // algorithm (see above)
-        /* eslint-disable no-control-regex */
-        parsedStr = parsedStr.replace(/\u0001\u0001/g, '\u0000')
-          .replace(/\u0001\u0002/g, '\u0001')
-          .replace(/\u0002\u0002/g, '\u0002');
-        /* eslint-enable no-control-regex */
-        stack.push(parsedStr);
-        break;
-      case '5':
-        var arrayElement = { element: [], index: stack.length };
-        stack.push(arrayElement.element);
-        metaStack.push(arrayElement);
-        break;
-      case '6':
-        var objElement = { element: {}, index: stack.length };
-        stack.push(objElement.element);
-        metaStack.push(objElement);
-        break;
-      /* istanbul ignore next */
-      default:
-        throw new Error(
-          'bad collationIndex or unexpectedly reached end of input: ' +
-            collationIndex);
-    }
-  }
-}
-
-function arrayCollate(a, b) {
-  var len = Math.min(a.length, b.length);
-  for (var i = 0; i < len; i++) {
-    var sort = collate(a[i], b[i]);
-    if (sort !== 0) {
-      return sort;
-    }
-  }
-  return (a.length === b.length) ? 0 :
-    (a.length > b.length) ? 1 : -1;
-}
-function stringCollate(a, b) {
-  // See: https://github.com/daleharvey/pouchdb/issues/40
-  // This is incompatible with the CouchDB implementation, but its the
-  // best we can do for now
-  return (a === b) ? 0 : ((a > b) ? 1 : -1);
-}
-function objectCollate(a, b) {
-  var ak = Object.keys(a), bk = Object.keys(b);
-  var len = Math.min(ak.length, bk.length);
-  for (var i = 0; i < len; i++) {
-    // First sort the keys
-    var sort = collate(ak[i], bk[i]);
-    if (sort !== 0) {
-      return sort;
-    }
-    // if the keys are equal sort the values
-    sort = collate(a[ak[i]], b[bk[i]]);
-    if (sort !== 0) {
-      return sort;
-    }
-
-  }
-  return (ak.length === bk.length) ? 0 :
-    (ak.length > bk.length) ? 1 : -1;
-}
-// The collation is defined by erlangs ordered terms
-// the atoms null, true, false come first, then numbers, strings,
-// arrays, then objects
-// null/undefined/NaN/Infinity/-Infinity are all considered null
-function collationIndex(x) {
-  var id = ['boolean', 'number', 'string', 'object'];
-  var idx = id.indexOf(typeof x);
-  //false if -1 otherwise true, but fast!!!!1
-  if (~idx) {
-    if (x === null) {
-      return 1;
-    }
-    if (Array.isArray(x)) {
-      return 5;
-    }
-    return idx < 3 ? (idx + 2) : (idx + 3);
-  }
-  /* istanbul ignore next */
-  if (Array.isArray(x)) {
-    return 5;
-  }
-}
-
-// conversion:
-// x yyy zz...zz
-// x = 0 for negative, 1 for 0, 2 for positive
-// y = exponent (for negative numbers negated) moved so that it's >= 0
-// z = mantisse
-function numToIndexableString(num) {
-
-  if (num === 0) {
-    return '1';
-  }
-
-  // convert number to exponential format for easier and
-  // more succinct string sorting
-  var expFormat = num.toExponential().split(/e\+?/);
-  var magnitude = parseInt(expFormat[1], 10);
-
-  var neg = num < 0;
-
-  var result = neg ? '0' : '2';
-
-  // first sort by magnitude
-  // it's easier if all magnitudes are positive
-  var magForComparison = ((neg ? -magnitude : magnitude) - MIN_MAGNITUDE);
-  var magString = padLeft((magForComparison).toString(), '0', MAGNITUDE_DIGITS);
-
-  result += SEP + magString;
-
-  // then sort by the factor
-  var factor = Math.abs(parseFloat(expFormat[0])); // [1..10)
-  /* istanbul ignore next */
-  if (neg) { // for negative reverse ordering
-    factor = 10 - factor;
-  }
-
-  var factorStr = factor.toFixed(20);
-
-  // strip zeros from the end
-  factorStr = factorStr.replace(/\.?0+$/, '');
-
-  result += SEP + factorStr;
-
-  return result;
-}
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-collections/lib/index.es.js":
-/*!**********************************************************!*\
-  !*** ./node_modules/pouchdb-collections/lib/index.es.js ***!
-  \**********************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "Set": () => (/* binding */ ExportedSet),
-/* harmony export */   "Map": () => (/* binding */ ExportedMap)
-/* harmony export */ });
-function mangle(key) {
-  return '$' + key;
-}
-function unmangle(key) {
-  return key.substring(1);
-}
-function Map$1() {
-  this._store = {};
-}
-Map$1.prototype.get = function (key) {
-  var mangled = mangle(key);
-  return this._store[mangled];
-};
-Map$1.prototype.set = function (key, value) {
-  var mangled = mangle(key);
-  this._store[mangled] = value;
-  return true;
-};
-Map$1.prototype.has = function (key) {
-  var mangled = mangle(key);
-  return mangled in this._store;
-};
-Map$1.prototype.delete = function (key) {
-  var mangled = mangle(key);
-  var res = mangled in this._store;
-  delete this._store[mangled];
-  return res;
-};
-Map$1.prototype.forEach = function (cb) {
-  var keys = Object.keys(this._store);
-  for (var i = 0, len = keys.length; i < len; i++) {
-    var key = keys[i];
-    var value = this._store[key];
-    key = unmangle(key);
-    cb(value, key);
-  }
-};
-Object.defineProperty(Map$1.prototype, 'size', {
-  get: function () {
-    return Object.keys(this._store).length;
-  }
-});
-
-function Set$1(array) {
-  this._store = new Map$1();
-
-  // init with an array
-  if (array && Array.isArray(array)) {
-    for (var i = 0, len = array.length; i < len; i++) {
-      this.add(array[i]);
-    }
-  }
-}
-Set$1.prototype.add = function (key) {
-  return this._store.set(key, true);
-};
-Set$1.prototype.has = function (key) {
-  return this._store.has(key);
-};
-Set$1.prototype.forEach = function (cb) {
-  this._store.forEach(function (value, key) {
-    cb(key);
-  });
-};
-Object.defineProperty(Set$1.prototype, 'size', {
-  get: function () {
-    return this._store.size;
-  }
-});
-
-/* global Map,Set,Symbol */
-// Based on https://kangax.github.io/compat-table/es6/ we can sniff out
-// incomplete Map/Set implementations which would otherwise cause our tests to fail.
-// Notably they fail in IE11 and iOS 8.4, which this prevents.
-function supportsMapAndSet() {
-  if (typeof Symbol === 'undefined' || typeof Map === 'undefined' || typeof Set === 'undefined') {
-    return false;
-  }
-  var prop = Object.getOwnPropertyDescriptor(Map, Symbol.species);
-  return prop && 'get' in prop && Map[Symbol.species] === Map;
-}
-
-// based on https://github.com/montagejs/collections
-
-var ExportedSet;
-var ExportedMap;
-
-{
-  if (supportsMapAndSet()) { // prefer built-in Map/Set
-    ExportedSet = Set;
-    ExportedMap = Map;
-  } else { // fall back to our polyfill
-    ExportedSet = Set$1;
-    ExportedMap = Map$1;
-  }
-}
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-errors/lib/index.es.js":
-/*!*****************************************************!*\
-  !*** ./node_modules/pouchdb-errors/lib/index.es.js ***!
-  \*****************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "UNAUTHORIZED": () => (/* binding */ UNAUTHORIZED),
-/* harmony export */   "MISSING_BULK_DOCS": () => (/* binding */ MISSING_BULK_DOCS),
-/* harmony export */   "MISSING_DOC": () => (/* binding */ MISSING_DOC),
-/* harmony export */   "REV_CONFLICT": () => (/* binding */ REV_CONFLICT),
-/* harmony export */   "INVALID_ID": () => (/* binding */ INVALID_ID),
-/* harmony export */   "MISSING_ID": () => (/* binding */ MISSING_ID),
-/* harmony export */   "RESERVED_ID": () => (/* binding */ RESERVED_ID),
-/* harmony export */   "NOT_OPEN": () => (/* binding */ NOT_OPEN),
-/* harmony export */   "UNKNOWN_ERROR": () => (/* binding */ UNKNOWN_ERROR),
-/* harmony export */   "BAD_ARG": () => (/* binding */ BAD_ARG),
-/* harmony export */   "INVALID_REQUEST": () => (/* binding */ INVALID_REQUEST),
-/* harmony export */   "QUERY_PARSE_ERROR": () => (/* binding */ QUERY_PARSE_ERROR),
-/* harmony export */   "DOC_VALIDATION": () => (/* binding */ DOC_VALIDATION),
-/* harmony export */   "BAD_REQUEST": () => (/* binding */ BAD_REQUEST),
-/* harmony export */   "NOT_AN_OBJECT": () => (/* binding */ NOT_AN_OBJECT),
-/* harmony export */   "DB_MISSING": () => (/* binding */ DB_MISSING),
-/* harmony export */   "WSQ_ERROR": () => (/* binding */ WSQ_ERROR),
-/* harmony export */   "LDB_ERROR": () => (/* binding */ LDB_ERROR),
-/* harmony export */   "FORBIDDEN": () => (/* binding */ FORBIDDEN),
-/* harmony export */   "INVALID_REV": () => (/* binding */ INVALID_REV),
-/* harmony export */   "FILE_EXISTS": () => (/* binding */ FILE_EXISTS),
-/* harmony export */   "MISSING_STUB": () => (/* binding */ MISSING_STUB),
-/* harmony export */   "IDB_ERROR": () => (/* binding */ IDB_ERROR),
-/* harmony export */   "INVALID_URL": () => (/* binding */ INVALID_URL),
-/* harmony export */   "createError": () => (/* binding */ createError),
-/* harmony export */   "generateErrorFromResponse": () => (/* binding */ generateErrorFromResponse)
-/* harmony export */ });
-/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! inherits */ "./node_modules/inherits/inherits_browser.js");
-/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(inherits__WEBPACK_IMPORTED_MODULE_0__);
-
-
-inherits__WEBPACK_IMPORTED_MODULE_0___default()(PouchError, Error);
-
-function PouchError(status, error, reason) {
-  Error.call(this, reason);
-  this.status = status;
-  this.name = error;
-  this.message = reason;
-  this.error = true;
-}
-
-PouchError.prototype.toString = function () {
-  return JSON.stringify({
-    status: this.status,
-    name: this.name,
-    message: this.message,
-    reason: this.reason
-  });
-};
-
-var UNAUTHORIZED = new PouchError(401, 'unauthorized', "Name or password is incorrect.");
-var MISSING_BULK_DOCS = new PouchError(400, 'bad_request', "Missing JSON list of 'docs'");
-var MISSING_DOC = new PouchError(404, 'not_found', 'missing');
-var REV_CONFLICT = new PouchError(409, 'conflict', 'Document update conflict');
-var INVALID_ID = new PouchError(400, 'bad_request', '_id field must contain a string');
-var MISSING_ID = new PouchError(412, 'missing_id', '_id is required for puts');
-var RESERVED_ID = new PouchError(400, 'bad_request', 'Only reserved document ids may start with underscore.');
-var NOT_OPEN = new PouchError(412, 'precondition_failed', 'Database not open');
-var UNKNOWN_ERROR = new PouchError(500, 'unknown_error', 'Database encountered an unknown error');
-var BAD_ARG = new PouchError(500, 'badarg', 'Some query argument is invalid');
-var INVALID_REQUEST = new PouchError(400, 'invalid_request', 'Request was invalid');
-var QUERY_PARSE_ERROR = new PouchError(400, 'query_parse_error', 'Some query parameter is invalid');
-var DOC_VALIDATION = new PouchError(500, 'doc_validation', 'Bad special document member');
-var BAD_REQUEST = new PouchError(400, 'bad_request', 'Something wrong with the request');
-var NOT_AN_OBJECT = new PouchError(400, 'bad_request', 'Document must be a JSON object');
-var DB_MISSING = new PouchError(404, 'not_found', 'Database not found');
-var IDB_ERROR = new PouchError(500, 'indexed_db_went_bad', 'unknown');
-var WSQ_ERROR = new PouchError(500, 'web_sql_went_bad', 'unknown');
-var LDB_ERROR = new PouchError(500, 'levelDB_went_went_bad', 'unknown');
-var FORBIDDEN = new PouchError(403, 'forbidden', 'Forbidden by design doc validate_doc_update function');
-var INVALID_REV = new PouchError(400, 'bad_request', 'Invalid rev format');
-var FILE_EXISTS = new PouchError(412, 'file_exists', 'The database could not be created, the file already exists.');
-var MISSING_STUB = new PouchError(412, 'missing_stub', 'A pre-existing attachment stub wasn\'t found');
-var INVALID_URL = new PouchError(413, 'invalid_url', 'Provided URL is invalid');
-
-function createError(error, reason) {
-  function CustomPouchError(reason) {
-    // inherit error properties from our parent error manually
-    // so as to allow proper JSON parsing.
-    /* jshint ignore:start */
-    var names = Object.getOwnPropertyNames(error);
-    for (var i = 0, len = names.length; i < len; i++) {
-      if (typeof error[names[i]] !== 'function') {
-        this[names[i]] = error[names[i]];
-      }
-    }
-    /* jshint ignore:end */
-    if (reason !== undefined) {
-      this.reason = reason;
-    }
-  }
-  CustomPouchError.prototype = PouchError.prototype;
-  return new CustomPouchError(reason);
-}
-
-function generateErrorFromResponse(err) {
-
-  if (typeof err !== 'object') {
-    var data = err;
-    err = UNKNOWN_ERROR;
-    err.data = data;
-  }
-
-  if ('error' in err && err.error === 'conflict') {
-    err.name = 'conflict';
-    err.status = 409;
-  }
-
-  if (!('name' in err)) {
-    err.name = err.error || 'unknown';
-  }
-
-  if (!('status' in err)) {
-    err.status = 500;
-  }
-
-  if (!('message' in err)) {
-    err.message = err.message || err.reason;
-  }
-
-  return err;
-}
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-fetch/lib/index-browser.es.js":
-/*!************************************************************!*\
-  !*** ./node_modules/pouchdb-fetch/lib/index-browser.es.js ***!
-  \************************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "fetch": () => (/* binding */ f),
-/* harmony export */   "Headers": () => (/* binding */ h),
-/* harmony export */   "AbortController": () => (/* binding */ a)
-/* harmony export */ });
-// AbortController was introduced quite a while after fetch and
-// isnt required for PouchDB to function so polyfill if needed
-var a = (typeof AbortController !== 'undefined')
-    ? AbortController
-    : function () { return {abort: function () {}}; };
-
-var f = fetch;
-var h = Headers;
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-find/lib/index-browser.es.js":
-/*!***********************************************************!*\
-  !*** ./node_modules/pouchdb-find/lib/index-browser.es.js ***!
-  \***********************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
-/* harmony export */ });
-/* harmony import */ var pouchdb_errors__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-errors */ "./node_modules/pouchdb-errors/lib/index.es.js");
-/* harmony import */ var pouchdb_fetch__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-fetch */ "./node_modules/pouchdb-fetch/lib/index-browser.es.js");
-/* harmony import */ var pouchdb_abstract_mapreduce__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! pouchdb-abstract-mapreduce */ "./node_modules/pouchdb-abstract-mapreduce/lib/index.es.js");
-/* harmony import */ var pouchdb_md5__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! pouchdb-md5 */ "./node_modules/pouchdb-md5/lib/index-browser.es.js");
-/* harmony import */ var pouchdb_collate__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! pouchdb-collate */ "./node_modules/pouchdb-collate/lib/index.es.js");
-/* harmony import */ var pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! pouchdb-selector-core */ "./node_modules/pouchdb-selector-core/lib/index.es.js");
-/* harmony import */ var pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! pouchdb-utils */ "./node_modules/pouchdb-utils/lib/index-browser.es.js");
-
-
-
-
-
-
-
-
-// we restucture the supplied JSON considerably, because the official
-// Mango API is very particular about a lot of this stuff, but we like
-// to be liberal with what we accept in order to prevent mental
-// breakdowns in our users
-function massageCreateIndexRequest(requestDef) {
-  requestDef = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(requestDef);
-
-  if (!requestDef.index) {
-    requestDef.index = {};
-  }
-
-  ['type', 'name', 'ddoc'].forEach(function (key) {
-    if (requestDef.index[key]) {
-      requestDef[key] = requestDef.index[key];
-      delete requestDef.index[key];
-    }
-  });
-
-  if (requestDef.fields) {
-    requestDef.index.fields = requestDef.fields;
-    delete requestDef.fields;
-  }
-
-  if (!requestDef.type) {
-    requestDef.type = 'json';
-  }
-  return requestDef;
-}
-
-function dbFetch(db, path, opts, callback) {
-  var status, ok;
-  opts.headers = new pouchdb_fetch__WEBPACK_IMPORTED_MODULE_1__.Headers({'Content-type': 'application/json'});
-  db.fetch(path, opts).then(function (response) {
-    status = response.status;
-    ok = response.ok;
-    return response.json();
-  }).then(function (json) {
-    if (!ok) {
-      json.status = status;
-      var err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_0__.generateErrorFromResponse)(json);
-      callback(err);
-    } else {
-      callback(null, json);
-    }
-  }).catch(callback);
-}
-
-function createIndex(db, requestDef, callback) {
-  requestDef = massageCreateIndexRequest(requestDef);
-  dbFetch(db, '_index', {
-    method: 'POST',
-    body: JSON.stringify(requestDef)
-  }, callback);
-}
-
-function find(db, requestDef, callback) {
-  dbFetch(db, '_find', {
-    method: 'POST',
-    body: JSON.stringify(requestDef)
-  }, callback);
-}
-
-function explain(db, requestDef, callback) {
-  dbFetch(db, '_explain', {
-    method: 'POST',
-    body: JSON.stringify(requestDef)
-  }, callback);
-}
-
-function getIndexes(db, callback) {
-  dbFetch(db, '_index', {
-    method: 'GET'
-  }, callback);
-}
-
-function deleteIndex(db, indexDef, callback) {
-
-
-  var ddoc = indexDef.ddoc;
-  var type = indexDef.type || 'json';
-  var name = indexDef.name;
-
-  if (!ddoc) {
-    return callback(new Error('you must provide an index\'s ddoc'));
-  }
-
-  if (!name) {
-    return callback(new Error('you must provide an index\'s name'));
-  }
-
-  var url = '_index/' + [ddoc, type, name].map(encodeURIComponent).join('/');
-
-  dbFetch(db, url, {method: 'DELETE'}, callback);
-}
-
-function getArguments(fun) {
-  return function () {
-    var len = arguments.length;
-    var args = new Array(len);
-    var i = -1;
-    while (++i < len) {
-      args[i] = arguments[i];
-    }
-    return fun.call(this, args);
-  };
-}
-
-function callbackify(fun) {
-  return getArguments(function (args) {
-    var cb = args.pop();
-    var promise = fun.apply(this, args);
-    promisedCallback(promise, cb);
-    return promise;
-  });
-}
-
-function promisedCallback(promise, callback) {
-  promise.then(function (res) {
-    (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.nextTick)(function () {
-      callback(null, res);
-    });
-  }, function (reason) {
-    (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.nextTick)(function () {
-      callback(reason);
-    });
-  });
-  return promise;
-}
-
-var flatten = getArguments(function (args) {
-  var res = [];
-  for (var i = 0, len = args.length; i < len; i++) {
-    var subArr = args[i];
-    if (Array.isArray(subArr)) {
-      res = res.concat(flatten.apply(null, subArr));
-    } else {
-      res.push(subArr);
-    }
-  }
-  return res;
-});
-
-function mergeObjects(arr) {
-  var res = {};
-  for (var i = 0, len = arr.length; i < len; i++) {
-    res = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.assign)(res, arr[i]);
-  }
-  return res;
-}
-
-// Selects a list of fields defined in dot notation from one doc
-// and copies them to a new doc. Like underscore _.pick but supports nesting.
-function pick(obj, arr) {
-  var res = {};
-  for (var i = 0, len = arr.length; i < len; i++) {
-    var parsedField = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.parseField)(arr[i]);
-    var value = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getFieldFromDoc)(obj, parsedField);
-    if (typeof value !== 'undefined') {
-      (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.setFieldInDoc)(res, parsedField, value);
-    }
-  }
-  return res;
-}
-
-// e.g. ['a'], ['a', 'b'] is true, but ['b'], ['a', 'b'] is false
-function oneArrayIsSubArrayOfOther(left, right) {
-
-  for (var i = 0, len = Math.min(left.length, right.length); i < len; i++) {
-    if (left[i] !== right[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// e.g.['a', 'b', 'c'], ['a', 'b'] is false
-function oneArrayIsStrictSubArrayOfOther(left, right) {
-
-  if (left.length > right.length) {
-    return false;
-  }
-
-  return oneArrayIsSubArrayOfOther(left, right);
-}
-
-// same as above, but treat the left array as an unordered set
-// e.g. ['b', 'a'], ['a', 'b', 'c'] is true, but ['c'], ['a', 'b', 'c'] is false
-function oneSetIsSubArrayOfOther(left, right) {
-  left = left.slice();
-  for (var i = 0, len = right.length; i < len; i++) {
-    var field = right[i];
-    if (!left.length) {
-      break;
-    }
-    var leftIdx = left.indexOf(field);
-    if (leftIdx === -1) {
-      return false;
-    } else {
-      left.splice(leftIdx, 1);
-    }
-  }
-  return true;
-}
-
-function arrayToObject(arr) {
-  var res = {};
-  for (var i = 0, len = arr.length; i < len; i++) {
-    res[arr[i]] = true;
-  }
-  return res;
-}
-
-function max(arr, fun) {
-  var max = null;
-  var maxScore = -1;
-  for (var i = 0, len = arr.length; i < len; i++) {
-    var element = arr[i];
-    var score = fun(element);
-    if (score > maxScore) {
-      maxScore = score;
-      max = element;
-    }
-  }
-  return max;
-}
-
-function arrayEquals(arr1, arr2) {
-  if (arr1.length !== arr2.length) {
-    return false;
-  }
-  for (var i = 0, len = arr1.length; i < len; i++) {
-    if (arr1[i] !== arr2[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function uniq(arr) {
-  var obj = {};
-  for (var i = 0; i < arr.length; i++) {
-    obj['$' + arr[i]] = true;
-  }
-  return Object.keys(obj).map(function (key) {
-    return key.substring(1);
-  });
-}
-
-//
-// One thing about these mappers:
-//
-// Per the advice of John-David Dalton (http://youtu.be/NthmeLEhDDM),
-// what you want to do in this case is optimize for the smallest possible
-// function, since that's the thing that gets run over and over again.
-//
-// This code would be a lot simpler if all the if/elses were inside
-// the function, but it would also be a lot less performant.
-//
-
-
-function createDeepMultiMapper(fields, emit) {
-  return function (doc) {
-    var toEmit = [];
-    for (var i = 0, iLen = fields.length; i < iLen; i++) {
-      var parsedField = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.parseField)(fields[i]);
-      var value = doc;
-      for (var j = 0, jLen = parsedField.length; j < jLen; j++) {
-        var key = parsedField[j];
-        value = value[key];
-        if (typeof value === 'undefined') {
-          return; // don't emit
-        }
-      }
-      toEmit.push(value);
-    }
-    emit(toEmit);
-  };
-}
-
-function createDeepSingleMapper(field, emit) {
-  var parsedField = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.parseField)(field);
-  return function (doc) {
-    var value = doc;
-    for (var i = 0, len = parsedField.length; i < len; i++) {
-      var key = parsedField[i];
-      value = value[key];
-      if (typeof value === 'undefined') {
-        return; // do nothing
-      }
-    }
-    emit(value);
-  };
-}
-
-function createShallowSingleMapper(field, emit) {
-  return function (doc) {
-    emit(doc[field]);
-  };
-}
-
-function createShallowMultiMapper(fields, emit) {
-  return function (doc) {
-    var toEmit = [];
-    for (var i = 0, len = fields.length; i < len; i++) {
-      toEmit.push(doc[fields[i]]);
-    }
-    emit(toEmit);
-  };
-}
-
-function checkShallow(fields) {
-  for (var i = 0, len = fields.length; i < len; i++) {
-    var field = fields[i];
-    if (field.indexOf('.') !== -1) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function createMapper(fields, emit) {
-  var isShallow = checkShallow(fields);
-  var isSingle = fields.length === 1;
-
-  // notice we try to optimize for the most common case,
-  // i.e. single shallow indexes
-  if (isShallow) {
-    if (isSingle) {
-      return createShallowSingleMapper(fields[0], emit);
-    } else { // multi
-      return createShallowMultiMapper(fields, emit);
-    }
-  } else { // deep
-    if (isSingle) {
-      return createDeepSingleMapper(fields[0], emit);
-    } else { // multi
-      return createDeepMultiMapper(fields, emit);
-    }
-  }
-}
-
-function mapper(mapFunDef, emit) {
-  // mapFunDef is a list of fields
-
-  var fields = Object.keys(mapFunDef.fields);
-
-  return createMapper(fields, emit);
-}
-
-/* istanbul ignore next */
-function reducer(/*reduceFunDef*/) {
-  throw new Error('reduce not supported');
-}
-
-function ddocValidator(ddoc, viewName) {
-  var view = ddoc.views[viewName];
-  // This doesn't actually need to be here apparently, but
-  // I feel safer keeping it.
-  /* istanbul ignore if */
-  if (!view.map || !view.map.fields) {
-    throw new Error('ddoc ' + ddoc._id +' with view ' + viewName +
-      ' doesn\'t have map.fields defined. ' +
-      'maybe it wasn\'t created by this plugin?');
-  }
-}
-
-var abstractMapper = (0,pouchdb_abstract_mapreduce__WEBPACK_IMPORTED_MODULE_2__["default"])(
-  /* localDocName */ 'indexes',
-  mapper,
-  reducer,
-  ddocValidator
-);
-
-function abstractMapper$1 (db) {
-  return db._customFindAbstractMapper || abstractMapper;
-}
-
-// normalize the "sort" value
-function massageSort(sort) {
-  if (!Array.isArray(sort)) {
-    throw new Error('invalid sort json - should be an array');
-  }
-  return sort.map(function (sorting) {
-    if (typeof sorting === 'string') {
-      var obj = {};
-      obj[sorting] = 'asc';
-      return obj;
-    } else {
-      return sorting;
-    }
-  });
-}
-
-function massageUseIndex(useIndex) {
-  var cleanedUseIndex = [];
-  if (typeof useIndex === 'string') {
-    cleanedUseIndex.push(useIndex);
-  } else {
-    cleanedUseIndex = useIndex;
-  }
-
-  return cleanedUseIndex.map(function (name) {
-    return name.replace('_design/', '');
-  });
-}
-
-function massageIndexDef(indexDef) {
-  indexDef.fields = indexDef.fields.map(function (field) {
-    if (typeof field === 'string') {
-      var obj = {};
-      obj[field] = 'asc';
-      return obj;
-    }
-    return field;
-  });
-  return indexDef;
-}
-
-function getKeyFromDoc(doc, index) {
-  var res = [];
-  for (var i = 0; i < index.def.fields.length; i++) {
-    var field = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(index.def.fields[i]);
-    res.push(doc[field]);
-  }
-  return res;
-}
-
-// have to do this manually because REASONS. I don't know why
-// CouchDB didn't implement inclusive_start
-function filterInclusiveStart(rows, targetValue, index) {
-  var indexFields = index.def.fields;
-  for (var i = 0, len = rows.length; i < len; i++) {
-    var row = rows[i];
-
-    // shave off any docs at the beginning that are <= the
-    // target value
-
-    var docKey = getKeyFromDoc(row.doc, index);
-    if (indexFields.length === 1) {
-      docKey = docKey[0]; // only one field, not multi-field
-    } else { // more than one field in index
-      // in the case where e.g. the user is searching {$gt: {a: 1}}
-      // but the index is [a, b], then we need to shorten the doc key
-      while (docKey.length > targetValue.length) {
-        docKey.pop();
-      }
-    }
-    //ABS as we just looking for values that don't match
-    if (Math.abs((0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_4__.collate)(docKey, targetValue)) > 0) {
-      // no need to filter any further; we're past the key
-      break;
-    }
-  }
-  return i > 0 ? rows.slice(i) : rows;
-}
-
-function reverseOptions(opts) {
-  var newOpts = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(opts);
-  delete newOpts.startkey;
-  delete newOpts.endkey;
-  delete newOpts.inclusive_start;
-  delete newOpts.inclusive_end;
-
-  if ('endkey' in opts) {
-    newOpts.startkey = opts.endkey;
-  }
-  if ('startkey' in opts) {
-    newOpts.endkey = opts.startkey;
-  }
-  if ('inclusive_start' in opts) {
-    newOpts.inclusive_end = opts.inclusive_start;
-  }
-  if ('inclusive_end' in opts) {
-    newOpts.inclusive_start = opts.inclusive_end;
-  }
-  return newOpts;
-}
-
-function validateIndex(index) {
-  var ascFields = index.fields.filter(function (field) {
-    return (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getValue)(field) === 'asc';
-  });
-  if (ascFields.length !== 0 && ascFields.length !== index.fields.length) {
-    throw new Error('unsupported mixed sorting');
-  }
-}
-
-function validateSort(requestDef, index) {
-  if (index.defaultUsed && requestDef.sort) {
-    var noneIdSorts = requestDef.sort.filter(function (sortItem) {
-      return Object.keys(sortItem)[0] !== '_id';
-    }).map(function (sortItem) {
-      return Object.keys(sortItem)[0];
-    });
-
-    if (noneIdSorts.length > 0) {
-      throw new Error('Cannot sort on field(s) "' + noneIdSorts.join(',') +
-      '" when using the default index');
-    }
-  }
-
-  if (index.defaultUsed) {
-    return;
-  }
-}
-
-function validateFindRequest(requestDef) {
-  if (typeof requestDef.selector !== 'object') {
-    throw new Error('you must provide a selector when you find()');
-  }
-
-  /*var selectors = requestDef.selector['$and'] || [requestDef.selector];
-  for (var i = 0; i < selectors.length; i++) {
-    var selector = selectors[i];
-    var keys = Object.keys(selector);
-    if (keys.length === 0) {
-      throw new Error('invalid empty selector');
-    }
-    //var selection = selector[keys[0]];
-    /*if (Object.keys(selection).length !== 1) {
-      throw new Error('invalid selector: ' + JSON.stringify(selection) +
-        ' - it must have exactly one key/value');
-    }
-  }*/
-}
-
-// determine the maximum number of fields
-// we're going to need to query, e.g. if the user
-// has selection ['a'] and sorting ['a', 'b'], then we
-// need to use the longer of the two: ['a', 'b']
-function getUserFields(selector, sort) {
-  var selectorFields = Object.keys(selector);
-  var sortFields = sort? sort.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey) : [];
-  var userFields;
-  if (selectorFields.length >= sortFields.length) {
-    userFields = selectorFields;
-  } else {
-    userFields = sortFields;
-  }
-
-  if (sortFields.length === 0) {
-    return {
-      fields: userFields
-    };
-  }
-
-  // sort according to the user's preferred sorting
-  userFields = userFields.sort(function (left, right) {
-    var leftIdx = sortFields.indexOf(left);
-    if (leftIdx === -1) {
-      leftIdx = Number.MAX_VALUE;
-    }
-    var rightIdx = sortFields.indexOf(right);
-    if (rightIdx === -1) {
-      rightIdx = Number.MAX_VALUE;
-    }
-    return leftIdx < rightIdx ? -1 : leftIdx > rightIdx ? 1 : 0;
-  });
-
-  return {
-    fields: userFields,
-    sortOrder: sort.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)
-  };
-}
-
-function createIndex$1(db, requestDef) {
-  requestDef = massageCreateIndexRequest(requestDef);
-  var originalIndexDef = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(requestDef.index);
-  requestDef.index = massageIndexDef(requestDef.index);
-
-  validateIndex(requestDef.index);
-
-  // calculating md5 is expensive - memoize and only
-  // run if required
-  var md5;
-  function getMd5() {
-    return md5 || (md5 = (0,pouchdb_md5__WEBPACK_IMPORTED_MODULE_3__.stringMd5)(JSON.stringify(requestDef)));
-  }
-
-  var viewName = requestDef.name || ('idx-' + getMd5());
-
-  var ddocName = requestDef.ddoc || ('idx-' + getMd5());
-  var ddocId = '_design/' + ddocName;
-
-  var hasInvalidLanguage = false;
-  var viewExists = false;
-
-  function updateDdoc(doc) {
-    if (doc._rev && doc.language !== 'query') {
-      hasInvalidLanguage = true;
-    }
-    doc.language = 'query';
-    doc.views = doc.views || {};
-
-    viewExists = !!doc.views[viewName];
-
-    if (viewExists) {
-      return false;
-    }
-
-    doc.views[viewName] = {
-      map: {
-        fields: mergeObjects(requestDef.index.fields)
-      },
-      reduce: '_count',
-      options: {
-        def: originalIndexDef
-      }
-    };
-
-    return doc;
-  }
-
-  db.constructor.emit('debug', ['find', 'creating index', ddocId]);
-
-  return (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.upsert)(db, ddocId, updateDdoc).then(function () {
-    if (hasInvalidLanguage) {
-      throw new Error('invalid language for ddoc with id "' +
-      ddocId +
-      '" (should be "query")');
-    }
-  }).then(function () {
-    // kick off a build
-    // TODO: abstract-pouchdb-mapreduce should support auto-updating
-    // TODO: should also use update_after, but pouchdb/pouchdb#3415 blocks me
-    var signature = ddocName + '/' + viewName;
-    return abstractMapper$1(db).query.call(db, signature, {
-      limit: 0,
-      reduce: false
-    }).then(function () {
-      return {
-        id: ddocId,
-        name: viewName,
-        result: viewExists ? 'exists' : 'created'
-      };
-    });
-  });
-}
-
-function getIndexes$1(db) {
-  // just search through all the design docs and filter in-memory.
-  // hopefully there aren't that many ddocs.
-  return db.allDocs({
-    startkey: '_design/',
-    endkey: '_design/\uffff',
-    include_docs: true
-  }).then(function (allDocsRes) {
-    var res = {
-      indexes: [{
-        ddoc: null,
-        name: '_all_docs',
-        type: 'special',
-        def: {
-          fields: [{_id: 'asc'}]
-        }
-      }]
-    };
-
-    res.indexes = flatten(res.indexes, allDocsRes.rows.filter(function (row) {
-      return row.doc.language === 'query';
-    }).map(function (row) {
-      var viewNames = row.doc.views !== undefined ? Object.keys(row.doc.views) : [];
-
-      return viewNames.map(function (viewName) {
-        var view = row.doc.views[viewName];
-        return {
-          ddoc: row.id,
-          name: viewName,
-          type: 'json',
-          def: massageIndexDef(view.options.def)
-        };
-      });
-    }));
-
-    // these are sorted by view name for some reason
-    res.indexes.sort(function (left, right) {
-      return (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.compare)(left.name, right.name);
-    });
-    res.total_rows = res.indexes.length;
-    return res;
-  });
-}
-
-// couchdb lowest collation value
-var COLLATE_LO = null;
-
-// couchdb highest collation value (TODO: well not really, but close enough amirite)
-var COLLATE_HI = {"\uffff": {}};
-
-const SHORT_CIRCUIT_QUERY = {
-  queryOpts: { limit: 0, startkey: COLLATE_HI, endkey: COLLATE_LO },
-  inMemoryFields: [],
-};
-
-// couchdb second-lowest collation value
-
-function checkFieldInIndex(index, field) {
-  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
-  for (var i = 0, len = indexFields.length; i < len; i++) {
-    var indexField = indexFields[i];
-    if (field === indexField) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// so when you do e.g. $eq/$eq, we can do it entirely in the database.
-// but when you do e.g. $gt/$eq, the first part can be done
-// in the database, but the second part has to be done in-memory,
-// because $gt has forced us to lose precision.
-// so that's what this determines
-function userOperatorLosesPrecision(selector, field) {
-  var matcher = selector[field];
-  var userOperator = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(matcher);
-
-  return userOperator !== '$eq';
-}
-
-// sort the user fields by their position in the index,
-// if they're in the index
-function sortFieldsByIndex(userFields, index) {
-  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
-
-  return userFields.slice().sort(function (a, b) {
-    var aIdx = indexFields.indexOf(a);
-    var bIdx = indexFields.indexOf(b);
-    if (aIdx === -1) {
-      aIdx = Number.MAX_VALUE;
-    }
-    if (bIdx === -1) {
-      bIdx = Number.MAX_VALUE;
-    }
-    return (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.compare)(aIdx, bIdx);
-  });
-}
-
-// first pass to try to find fields that will need to be sorted in-memory
-function getBasicInMemoryFields(index, selector, userFields) {
-
-  userFields = sortFieldsByIndex(userFields, index);
-
-  // check if any of the user selectors lose precision
-  var needToFilterInMemory = false;
-  for (var i = 0, len = userFields.length; i < len; i++) {
-    var field = userFields[i];
-    if (needToFilterInMemory || !checkFieldInIndex(index, field)) {
-      return userFields.slice(i);
-    }
-    if (i < len - 1 && userOperatorLosesPrecision(selector, field)) {
-      needToFilterInMemory = true;
-    }
-  }
-  return [];
-}
-
-function getInMemoryFieldsFromNe(selector) {
-  var fields = [];
-  Object.keys(selector).forEach(function (field) {
-    var matcher = selector[field];
-    Object.keys(matcher).forEach(function (operator) {
-      if (operator === '$ne') {
-        fields.push(field);
-      }
-    });
-  });
-  return fields;
-}
-
-function getInMemoryFields(coreInMemoryFields, index, selector, userFields) {
-  var result = flatten(
-    // in-memory fields reported as necessary by the query planner
-    coreInMemoryFields,
-    // combine with another pass that checks for any we may have missed
-    getBasicInMemoryFields(index, selector, userFields),
-    // combine with another pass that checks for $ne's
-    getInMemoryFieldsFromNe(selector)
-  );
-
-  return sortFieldsByIndex(uniq(result), index);
-}
-
-// check that at least one field in the user's query is represented
-// in the index. order matters in the case of sorts
-function checkIndexFieldsMatch(indexFields, sortOrder, fields) {
-  if (sortOrder) {
-    // array has to be a strict subarray of index array. furthermore,
-    // the sortOrder fields need to all be represented in the index
-    var sortMatches = oneArrayIsStrictSubArrayOfOther(sortOrder, indexFields);
-    var selectorMatches = oneArrayIsSubArrayOfOther(fields, indexFields);
-
-    return sortMatches && selectorMatches;
-  }
-
-  // all of the user's specified fields still need to be
-  // on the left side of the index array, although the order
-  // doesn't matter
-  return oneSetIsSubArrayOfOther(fields, indexFields);
-}
-
-var logicalMatchers = ['$eq', '$gt', '$gte', '$lt', '$lte'];
-function isNonLogicalMatcher(matcher) {
-  return logicalMatchers.indexOf(matcher) === -1;
-}
-
-// check all the index fields for usages of '$ne'
-// e.g. if the user queries {foo: {$ne: 'foo'}, bar: {$eq: 'bar'}},
-// then we can neither use an index on ['foo'] nor an index on
-// ['foo', 'bar'], but we can use an index on ['bar'] or ['bar', 'foo']
-function checkFieldsLogicallySound(indexFields, selector) {
-  var firstField = indexFields[0];
-  var matcher = selector[firstField];
-
-  if (typeof matcher === 'undefined') {
-    /* istanbul ignore next */
-    return true;
-  }
-
-  var isInvalidNe = Object.keys(matcher).length === 1 &&
-    (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(matcher) === '$ne';
-
-  return !isInvalidNe;
-}
-
-function checkIndexMatches(index, sortOrder, fields, selector) {
-
-  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
-
-  var fieldsMatch = checkIndexFieldsMatch(indexFields, sortOrder, fields);
-
-  if (!fieldsMatch) {
-    return false;
-  }
-
-  return checkFieldsLogicallySound(indexFields, selector);
-}
-
-//
-// the algorithm is very simple:
-// take all the fields the user supplies, and if those fields
-// are a strict subset of the fields in some index,
-// then use that index
-//
-//
-function findMatchingIndexes(selector, userFields, sortOrder, indexes) {
-  return indexes.filter(function (index) {
-    return checkIndexMatches(index, sortOrder, userFields, selector);
-  });
-}
-
-// find the best index, i.e. the one that matches the most fields
-// in the user's query
-function findBestMatchingIndex(selector, userFields, sortOrder, indexes, useIndex) {
-
-  var matchingIndexes = findMatchingIndexes(selector, userFields, sortOrder, indexes);
-
-  if (matchingIndexes.length === 0) {
-    if (useIndex) {
-      throw {
-        error: "no_usable_index",
-        message: "There is no index available for this selector."
-      };
-    }
-    //return `all_docs` as a default index;
-    //I'm assuming that _all_docs is always first
-    var defaultIndex = indexes[0];
-    defaultIndex.defaultUsed = true;
-    return defaultIndex;
-  }
-  if (matchingIndexes.length === 1 && !useIndex) {
-    return matchingIndexes[0];
-  }
-
-  var userFieldsMap = arrayToObject(userFields);
-
-  function scoreIndex(index) {
-    var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
-    var score = 0;
-    for (var i = 0, len = indexFields.length; i < len; i++) {
-      var indexField = indexFields[i];
-      if (userFieldsMap[indexField]) {
-        score++;
-      }
-    }
-    return score;
-  }
-
-  if (useIndex) {
-    var useIndexDdoc = '_design/' + useIndex[0];
-    var useIndexName = useIndex.length === 2 ? useIndex[1] : false;
-    var index = matchingIndexes.find(function (index) {
-      if (useIndexName && index.ddoc === useIndexDdoc && useIndexName === index.name) {
-        return true;
-      }
-
-      if (index.ddoc === useIndexDdoc) {
-        /* istanbul ignore next */
-        return true;
-      }
-
-      return false;
-    });
-
-    if (!index) {
-      throw {
-        error: "unknown_error",
-        message: "Could not find that index or could not use that index for the query"
-      };
-    }
-    return index;
-  }
-
-  return max(matchingIndexes, scoreIndex);
-}
-
-function getSingleFieldQueryOptsFor(userOperator, userValue) {
-  switch (userOperator) {
-    case '$eq':
-      return {key: userValue};
-    case '$lte':
-      return {endkey: userValue};
-    case '$gte':
-      return {startkey: userValue};
-    case '$lt':
-      return {
-        endkey: userValue,
-        inclusive_end: false
-      };
-    case '$gt':
-      return {
-        startkey: userValue,
-        inclusive_start: false
-      };
-  }
-
-  return {
-    startkey: COLLATE_LO
-  };
-}
-
-function getSingleFieldCoreQueryPlan(selector, index) {
-  var field = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(index.def.fields[0]);
-  //ignoring this because the test to exercise the branch is skipped at the moment
-  /* istanbul ignore next */
-  var matcher = selector[field] || {};
-  var inMemoryFields = [];
-
-  var userOperators = Object.keys(matcher);
-
-  var combinedOpts;
-
-  userOperators.forEach(function (userOperator) {
-
-    if (isNonLogicalMatcher(userOperator)) {
-      inMemoryFields.push(field);
-    }
-
-    var userValue = matcher[userOperator];
-
-    var newQueryOpts = getSingleFieldQueryOptsFor(userOperator, userValue);
-
-    if (combinedOpts) {
-      combinedOpts = mergeObjects([combinedOpts, newQueryOpts]);
-    } else {
-      combinedOpts = newQueryOpts;
-    }
-  });
-
-  return {
-    queryOpts: combinedOpts,
-    inMemoryFields: inMemoryFields
-  };
-}
-
-function getMultiFieldCoreQueryPlan(userOperator, userValue) {
-  switch (userOperator) {
-    case '$eq':
-      return {
-        startkey: userValue,
-        endkey: userValue
-      };
-    case '$lte':
-      return {
-        endkey: userValue
-      };
-    case '$gte':
-      return {
-        startkey: userValue
-      };
-    case '$lt':
-      return {
-        endkey: userValue,
-        inclusive_end: false
-      };
-    case '$gt':
-      return {
-        startkey: userValue,
-        inclusive_start: false
-      };
-  }
-}
-
-function getMultiFieldQueryOpts(selector, index) {
-
-  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
-
-  var inMemoryFields = [];
-  var startkey = [];
-  var endkey = [];
-  var inclusiveStart;
-  var inclusiveEnd;
-
-
-  function finish(i) {
-
-    if (inclusiveStart !== false) {
-      startkey.push(COLLATE_LO);
-    }
-    if (inclusiveEnd !== false) {
-      endkey.push(COLLATE_HI);
-    }
-    // keep track of the fields where we lost specificity,
-    // and therefore need to filter in-memory
-    inMemoryFields = indexFields.slice(i);
-  }
-
-  for (var i = 0, len = indexFields.length; i < len; i++) {
-    var indexField = indexFields[i];
-
-    var matcher = selector[indexField];
-
-    if (!matcher || !Object.keys(matcher).length) { // fewer fields in user query than in index
-      finish(i);
-      break;
-    } else if (Object.keys(matcher).some(isNonLogicalMatcher)) { // non-logical are ignored
-      finish(i);
-      break;
-    } else if (i > 0) {
-      var usingGtlt = (
-        '$gt' in matcher || '$gte' in matcher ||
-        '$lt' in matcher || '$lte' in matcher);
-      var previousKeys = Object.keys(selector[indexFields[i - 1]]);
-      var previousWasEq = arrayEquals(previousKeys, ['$eq']);
-      var previousWasSame = arrayEquals(previousKeys, Object.keys(matcher));
-      var gtltLostSpecificity = usingGtlt && !previousWasEq && !previousWasSame;
-      if (gtltLostSpecificity) {
-        finish(i);
-        break;
-      }
-    }
-
-    var userOperators = Object.keys(matcher);
-
-    var combinedOpts = null;
-
-    for (var j = 0; j < userOperators.length; j++) {
-      var userOperator = userOperators[j];
-      var userValue = matcher[userOperator];
-
-      var newOpts = getMultiFieldCoreQueryPlan(userOperator, userValue);
-
-      if (combinedOpts) {
-        combinedOpts = mergeObjects([combinedOpts, newOpts]);
-      } else {
-        combinedOpts = newOpts;
-      }
-    }
-
-    startkey.push('startkey' in combinedOpts ? combinedOpts.startkey : COLLATE_LO);
-    endkey.push('endkey' in combinedOpts ? combinedOpts.endkey : COLLATE_HI);
-    if ('inclusive_start' in combinedOpts) {
-      inclusiveStart = combinedOpts.inclusive_start;
-    }
-    if ('inclusive_end' in combinedOpts) {
-      inclusiveEnd = combinedOpts.inclusive_end;
-    }
-  }
-
-  var res = {
-    startkey: startkey,
-    endkey: endkey
-  };
-
-  if (typeof inclusiveStart !== 'undefined') {
-    res.inclusive_start = inclusiveStart;
-  }
-  if (typeof inclusiveEnd !== 'undefined') {
-    res.inclusive_end = inclusiveEnd;
-  }
-
-  return {
-    queryOpts: res,
-    inMemoryFields: inMemoryFields
-  };
-}
-
-function shouldShortCircuit(selector) {
-  // We have a field to select from, but not a valid value
-  // this should result in a short circuited query 
-  // just like the http adapter (couchdb) and mongodb
-  // see tests for issue #7810
-  
-  // @todo Use 'Object.values' when Node.js v6 support is dropped.
-  const values = Object.keys(selector).map(function (key) {
-    return selector[key];
-  });
-  return values.some(function (val) { 
-    return typeof val === 'object' && Object.keys(val).length === 0;
-});
-}
-
-function getDefaultQueryPlan(selector) {
-  //using default index, so all fields need to be done in memory
-  return {
-    queryOpts: {startkey: null},
-    inMemoryFields: [Object.keys(selector)]
-  };
-}
-
-function getCoreQueryPlan(selector, index) {
-  if (index.defaultUsed) {
-    return getDefaultQueryPlan(selector, index);
-  }
-
-  if (index.def.fields.length === 1) {
-    // one field in index, so the value was indexed as a singleton
-    return getSingleFieldCoreQueryPlan(selector, index);
-  }
-  // else index has multiple fields, so the value was indexed as an array
-  return getMultiFieldQueryOpts(selector, index);
-}
-
-function planQuery(request, indexes) {
-
-  var selector = request.selector;
-  var sort = request.sort;
-
-  if (shouldShortCircuit(selector)) {
-    return (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.assign)({}, SHORT_CIRCUIT_QUERY, { index: indexes[0] });
-  }
-
-  var userFieldsRes = getUserFields(selector, sort);
-
-  var userFields = userFieldsRes.fields;
-  var sortOrder = userFieldsRes.sortOrder;
-  var index = findBestMatchingIndex(selector, userFields, sortOrder, indexes, request.use_index);
-
-  var coreQueryPlan = getCoreQueryPlan(selector, index);
-  var queryOpts = coreQueryPlan.queryOpts;
-  var coreInMemoryFields = coreQueryPlan.inMemoryFields;
-
-  var inMemoryFields = getInMemoryFields(coreInMemoryFields, index, selector, userFields);
-
-  var res = {
-    queryOpts: queryOpts,
-    index: index,
-    inMemoryFields: inMemoryFields
-  };
-  return res;
-}
-
-function indexToSignature(index) {
-  // remove '_design/'
-  return index.ddoc.substring(8) + '/' + index.name;
-}
-
-function doAllDocs(db, originalOpts) {
-  var opts = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(originalOpts);
-
-  // CouchDB responds in weird ways when you provide a non-string to _id;
-  // we mimic the behavior for consistency. See issue66 tests for details.
-  if (opts.descending) {
-    if ('endkey' in opts && typeof opts.endkey !== 'string') {
-      opts.endkey = '';
-    }
-    if ('startkey' in opts && typeof opts.startkey !== 'string') {
-      opts.limit = 0;
-    }
-  } else {
-    if ('startkey' in opts && typeof opts.startkey !== 'string') {
-      opts.startkey = '';
-    }
-    if ('endkey' in opts && typeof opts.endkey !== 'string') {
-      opts.limit = 0;
-    }
-  }
-  if ('key' in opts && typeof opts.key !== 'string') {
-    opts.limit = 0;
-  }
-
-  if (opts.limit > 0 && opts.indexes_count) {
-    // brute force and quite naive impl.
-    // amp up the limit with the amount of (indexes) design docs
-    // or is this too naive? How about skip?
-    opts.original_limit = opts.limit;
-    opts.limit += opts.indexes_count;
-  }
-
-  return db.allDocs(opts)
-    .then(function (res) {
-      // filter out any design docs that _all_docs might return
-      res.rows = res.rows.filter(function (row) {
-        return !/^_design\//.test(row.id);
-      });
-      // put back original limit
-      if (opts.original_limit) {
-        opts.limit = opts.original_limit;
-      }
-      // enforce the rows to respect the given limit
-      res.rows = res.rows.slice(0, opts.limit);
-      return res;
-    });
-}
-
-function find$1(db, requestDef, explain) {
-  if (requestDef.selector) {
-    requestDef.selector = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.massageSelector)(requestDef.selector);
-  }
-
-  if (requestDef.sort) {
-    requestDef.sort = massageSort(requestDef.sort);
-  }
-
-  if (requestDef.use_index) {
-    requestDef.use_index = massageUseIndex(requestDef.use_index);
-  }
-
-  validateFindRequest(requestDef);
-
-  return getIndexes$1(db).then(function (getIndexesRes) {
-
-    db.constructor.emit('debug', ['find', 'planning query', requestDef]);
-    var queryPlan = planQuery(requestDef, getIndexesRes.indexes);
-    db.constructor.emit('debug', ['find', 'query plan', queryPlan]);
-    
-    var indexToUse = queryPlan.index;
-    
-    validateSort(requestDef, indexToUse);
-
-    var opts = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.assign)({
-      include_docs: true,
-      reduce: false,
-      // Add amount of index for doAllDocs to use (related to issue #7810)
-      indexes_count: getIndexesRes.total_rows, 
-    }, queryPlan.queryOpts);
-
-    if ('startkey' in opts && 'endkey' in opts &&
-        (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_4__.collate)(opts.startkey, opts.endkey) > 0) {
-      // can't possibly return any results, startkey > endkey
-      /* istanbul ignore next */
-      return {docs: []};
-    }
-
-    var isDescending = requestDef.sort &&
-      typeof requestDef.sort[0] !== 'string' &&
-      (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getValue)(requestDef.sort[0]) === 'desc';
-
-    if (isDescending) {
-      // either all descending or all ascending
-      opts.descending = true;
-      opts = reverseOptions(opts);
-    }
-
-    if (!queryPlan.inMemoryFields.length) {
-      // no in-memory filtering necessary, so we can let the
-      // database do the limit/skip for us
-      if ('limit' in requestDef) {
-        opts.limit = requestDef.limit;
-      }
-      if ('skip' in requestDef) {
-        opts.skip = requestDef.skip;
-      }
-    }
-
-    if (explain) {
-      return Promise.resolve(queryPlan, opts);
-    }
-
-    return Promise.resolve().then(function () {
-      if (indexToUse.name === '_all_docs') {
-        return doAllDocs(db, opts);
-      } else {
-        var signature = indexToSignature(indexToUse);
-        return abstractMapper$1(db).query.call(db, signature, opts);
-      }
-    }).then(function (res) {
-      if (opts.inclusive_start === false) {
-        // may have to manually filter the first one,
-        // since couchdb has no true inclusive_start option
-        res.rows = filterInclusiveStart(res.rows, opts.startkey, indexToUse);
-      }
-
-      if (queryPlan.inMemoryFields.length) {
-        // need to filter some stuff in-memory
-        res.rows = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.filterInMemoryFields)(res.rows, requestDef, queryPlan.inMemoryFields);
-      }
-
-      var resp = {
-        docs: res.rows.map(function (row) {
-          var doc = row.doc;
-          if (requestDef.fields) {
-            return pick(doc, requestDef.fields);
-          }
-          return doc;
-        })
-      };
-
-      if (indexToUse.defaultUsed) {
-        resp.warning = 'No matching index found, create an index to optimize query time.';
-      }
-
-      return resp;
-    });
-  });
-}
-
-function explain$1(db, requestDef) {
-  return find$1(db, requestDef, true)
-  .then(function (queryPlan) {
-    return {
-      dbname: db.name,
-      index: queryPlan.index,
-      selector: requestDef.selector,
-      range: {
-        start_key: queryPlan.queryOpts.startkey,
-        end_key: queryPlan.queryOpts.endkey,
-      },
-      opts: {
-        use_index: requestDef.use_index || [],
-        bookmark: "nil", //hardcoded to match CouchDB since its not supported,
-        limit: requestDef.limit,
-        skip: requestDef.skip,
-        sort: requestDef.sort || {},
-        fields: requestDef.fields,
-        conflicts: false, //hardcoded to match CouchDB since its not supported,
-        r: [49], // hardcoded to match CouchDB since its not support
-      },
-      limit: requestDef.limit,
-      skip: requestDef.skip || 0,
-      fields: requestDef.fields,
-    };
-  });
-}
-
-function deleteIndex$1(db, index) {
-
-  if (!index.ddoc) {
-    throw new Error('you must supply an index.ddoc when deleting');
-  }
-
-  if (!index.name) {
-    throw new Error('you must supply an index.name when deleting');
-  }
-
-  var docId = index.ddoc;
-  var viewName = index.name;
-
-  function deltaFun(doc) {
-    if (Object.keys(doc.views).length === 1 && doc.views[viewName]) {
-      // only one view in this ddoc, delete the whole ddoc
-      return {_id: docId, _deleted: true};
-    }
-    // more than one view here, just remove the view
-    delete doc.views[viewName];
-    return doc;
-  }
-
-  return (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.upsert)(db, docId, deltaFun).then(function () {
-    return abstractMapper$1(db).viewCleanup.apply(db);
-  }).then(function () {
-    return {ok: true};
-  });
-}
-
-var createIndexAsCallback = callbackify(createIndex$1);
-var findAsCallback = callbackify(find$1);
-var explainAsCallback = callbackify(explain$1);
-var getIndexesAsCallback = callbackify(getIndexes$1);
-var deleteIndexAsCallback = callbackify(deleteIndex$1);
-
-var plugin = {};
-plugin.createIndex = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (requestDef, callback) {
-
-  if (typeof requestDef !== 'object') {
-    return callback(new Error('you must provide an index to create'));
-  }
-
-  var createIndex$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ?
-    createIndex : createIndexAsCallback;
-  createIndex$$1(this, requestDef, callback);
-});
-
-plugin.find = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (requestDef, callback) {
-
-  if (typeof callback === 'undefined') {
-    callback = requestDef;
-    requestDef = undefined;
-  }
-
-  if (typeof requestDef !== 'object') {
-    return callback(new Error('you must provide search parameters to find()'));
-  }
-
-  var find$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ? find : findAsCallback;
-  find$$1(this, requestDef, callback);
-});
-
-plugin.explain = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (requestDef, callback) {
-
-  if (typeof callback === 'undefined') {
-    callback = requestDef;
-    requestDef = undefined;
-  }
-
-  if (typeof requestDef !== 'object') {
-    return callback(new Error('you must provide search parameters to explain()'));
-  }
-
-  var find$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ? explain : explainAsCallback;
-  find$$1(this, requestDef, callback);
-});
-
-plugin.getIndexes = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (callback) {
-
-  var getIndexes$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ? getIndexes : getIndexesAsCallback;
-  getIndexes$$1(this, callback);
-});
-
-plugin.deleteIndex = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (indexDef, callback) {
-
-  if (typeof indexDef !== 'object') {
-    return callback(new Error('you must provide an index to delete'));
-  }
-
-  var deleteIndex$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ?
-    deleteIndex : deleteIndexAsCallback;
-  deleteIndex$$1(this, indexDef, callback);
-});
-
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (plugin);
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-mapreduce-utils/lib/index.es.js":
-/*!**************************************************************!*\
-  !*** ./node_modules/pouchdb-mapreduce-utils/lib/index.es.js ***!
-  \**************************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "uniq": () => (/* binding */ uniq),
-/* harmony export */   "sequentialize": () => (/* binding */ sequentialize),
-/* harmony export */   "fin": () => (/* binding */ fin),
-/* harmony export */   "callbackify": () => (/* binding */ callbackify),
-/* harmony export */   "promisedCallback": () => (/* binding */ promisedCallback),
-/* harmony export */   "mapToKeysArray": () => (/* binding */ mapToKeysArray),
-/* harmony export */   "QueryParseError": () => (/* binding */ QueryParseError),
-/* harmony export */   "NotFoundError": () => (/* binding */ NotFoundError),
-/* harmony export */   "BuiltInError": () => (/* binding */ BuiltInError)
-/* harmony export */ });
-/* harmony import */ var pouchdb_collections__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-collections */ "./node_modules/pouchdb-collections/lib/index.es.js");
-/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! argsarray */ "./node_modules/argsarray/index.js");
-/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(argsarray__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var pouchdb_utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! pouchdb-utils */ "./node_modules/pouchdb-utils/lib/index-browser.es.js");
-/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! inherits */ "./node_modules/inherits/inherits_browser.js");
-/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(inherits__WEBPACK_IMPORTED_MODULE_3__);
-
-
-
-
-
-function QueryParseError(message) {
-  this.status = 400;
-  this.name = 'query_parse_error';
-  this.message = message;
-  this.error = true;
-  try {
-    Error.captureStackTrace(this, QueryParseError);
-  } catch (e) {}
-}
-
-inherits__WEBPACK_IMPORTED_MODULE_3___default()(QueryParseError, Error);
-
-function NotFoundError(message) {
-  this.status = 404;
-  this.name = 'not_found';
-  this.message = message;
-  this.error = true;
-  try {
-    Error.captureStackTrace(this, NotFoundError);
-  } catch (e) {}
-}
-
-inherits__WEBPACK_IMPORTED_MODULE_3___default()(NotFoundError, Error);
-
-function BuiltInError(message) {
-  this.status = 500;
-  this.name = 'invalid_value';
-  this.message = message;
-  this.error = true;
-  try {
-    Error.captureStackTrace(this, BuiltInError);
-  } catch (e) {}
-}
-
-inherits__WEBPACK_IMPORTED_MODULE_3___default()(BuiltInError, Error);
-
-function promisedCallback(promise, callback) {
-  if (callback) {
-    promise.then(function (res) {
-      (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_2__.nextTick)(function () {
-        callback(null, res);
-      });
-    }, function (reason) {
-      (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_2__.nextTick)(function () {
-        callback(reason);
-      });
-    });
-  }
-  return promise;
-}
-
-function callbackify(fun) {
-  return argsarray__WEBPACK_IMPORTED_MODULE_1___default()(function (args) {
-    var cb = args.pop();
-    var promise = fun.apply(this, args);
-    if (typeof cb === 'function') {
-      promisedCallback(promise, cb);
-    }
-    return promise;
-  });
-}
-
-// Promise finally util similar to Q.finally
-function fin(promise, finalPromiseFactory) {
-  return promise.then(function (res) {
-    return finalPromiseFactory().then(function () {
-      return res;
-    });
-  }, function (reason) {
-    return finalPromiseFactory().then(function () {
-      throw reason;
-    });
-  });
-}
-
-function sequentialize(queue, promiseFactory) {
-  return function () {
-    var args = arguments;
-    var that = this;
-    return queue.add(function () {
-      return promiseFactory.apply(that, args);
-    });
-  };
-}
-
-// uniq an array of strings, order not guaranteed
-// similar to underscore/lodash _.uniq
-function uniq(arr) {
-  var theSet = new pouchdb_collections__WEBPACK_IMPORTED_MODULE_0__.Set(arr);
-  var result = new Array(theSet.size);
-  var index = -1;
-  theSet.forEach(function (value) {
-    result[++index] = value;
-  });
-  return result;
-}
-
-function mapToKeysArray(map) {
-  var result = new Array(map.size);
-  var index = -1;
-  map.forEach(function (value, key) {
-    result[++index] = key;
-  });
-  return result;
-}
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-md5/lib/index-browser.es.js":
-/*!**********************************************************!*\
-  !*** ./node_modules/pouchdb-md5/lib/index-browser.es.js ***!
-  \**********************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "binaryMd5": () => (/* binding */ binaryMd5),
-/* harmony export */   "stringMd5": () => (/* binding */ stringMd5)
-/* harmony export */ });
-/* harmony import */ var pouchdb_binary_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-binary-utils */ "./node_modules/pouchdb-binary-utils/lib/index-browser.es.js");
-/* harmony import */ var spark_md5__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! spark-md5 */ "./node_modules/spark-md5/spark-md5.js");
-/* harmony import */ var spark_md5__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(spark_md5__WEBPACK_IMPORTED_MODULE_1__);
-
-
-
-var setImmediateShim = self.setImmediate || self.setTimeout;
-var MD5_CHUNK_SIZE = 32768;
-
-function rawToBase64(raw) {
-  return (0,pouchdb_binary_utils__WEBPACK_IMPORTED_MODULE_0__.btoa)(raw);
-}
-
-function sliceBlob(blob, start, end) {
-  if (blob.webkitSlice) {
-    return blob.webkitSlice(start, end);
-  }
-  return blob.slice(start, end);
-}
-
-function appendBlob(buffer, blob, start, end, callback) {
-  if (start > 0 || end < blob.size) {
-    // only slice blob if we really need to
-    blob = sliceBlob(blob, start, end);
-  }
-  (0,pouchdb_binary_utils__WEBPACK_IMPORTED_MODULE_0__.readAsArrayBuffer)(blob, function (arrayBuffer) {
-    buffer.append(arrayBuffer);
-    callback();
-  });
-}
-
-function appendString(buffer, string, start, end, callback) {
-  if (start > 0 || end < string.length) {
-    // only create a substring if we really need to
-    string = string.substring(start, end);
-  }
-  buffer.appendBinary(string);
-  callback();
-}
-
-function binaryMd5(data, callback) {
-  var inputIsString = typeof data === 'string';
-  var len = inputIsString ? data.length : data.size;
-  var chunkSize = Math.min(MD5_CHUNK_SIZE, len);
-  var chunks = Math.ceil(len / chunkSize);
-  var currentChunk = 0;
-  var buffer = inputIsString ? new (spark_md5__WEBPACK_IMPORTED_MODULE_1___default())() : new (spark_md5__WEBPACK_IMPORTED_MODULE_1___default().ArrayBuffer)();
-
-  var append = inputIsString ? appendString : appendBlob;
-
-  function next() {
-    setImmediateShim(loadNextChunk);
-  }
-
-  function done() {
-    var raw = buffer.end(true);
-    var base64 = rawToBase64(raw);
-    callback(base64);
-    buffer.destroy();
-  }
-
-  function loadNextChunk() {
-    var start = currentChunk * chunkSize;
-    var end = start + chunkSize;
-    currentChunk++;
-    if (currentChunk < chunks) {
-      append(buffer, data, start, end, next);
-    } else {
-      append(buffer, data, start, end, done);
-    }
-  }
-  loadNextChunk();
-}
-
-function stringMd5(string) {
-  return spark_md5__WEBPACK_IMPORTED_MODULE_1___default().hash(string);
-}
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-selector-core/lib/index.es.js":
-/*!************************************************************!*\
-  !*** ./node_modules/pouchdb-selector-core/lib/index.es.js ***!
-  \************************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "massageSelector": () => (/* binding */ massageSelector),
-/* harmony export */   "matchesSelector": () => (/* binding */ matchesSelector),
-/* harmony export */   "filterInMemoryFields": () => (/* binding */ filterInMemoryFields),
-/* harmony export */   "createFieldSorter": () => (/* binding */ createFieldSorter),
-/* harmony export */   "rowFilter": () => (/* binding */ rowFilter),
-/* harmony export */   "isCombinationalField": () => (/* binding */ isCombinationalField),
-/* harmony export */   "getKey": () => (/* binding */ getKey),
-/* harmony export */   "getValue": () => (/* binding */ getValue),
-/* harmony export */   "getFieldFromDoc": () => (/* binding */ getFieldFromDoc),
-/* harmony export */   "setFieldInDoc": () => (/* binding */ setFieldInDoc),
-/* harmony export */   "compare": () => (/* binding */ compare),
-/* harmony export */   "parseField": () => (/* binding */ parseField)
-/* harmony export */ });
-/* harmony import */ var pouchdb_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-utils */ "./node_modules/pouchdb-utils/lib/index-browser.es.js");
-/* harmony import */ var pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-collate */ "./node_modules/pouchdb-collate/lib/index.es.js");
-
-
-
-// this would just be "return doc[field]", but fields
-// can be "deep" due to dot notation
-function getFieldFromDoc(doc, parsedField) {
-  var value = doc;
-  for (var i = 0, len = parsedField.length; i < len; i++) {
-    var key = parsedField[i];
-    value = value[key];
-    if (!value) {
-      break;
-    }
-  }
-  return value;
-}
-
-function setFieldInDoc(doc, parsedField, value) {
-  for (var i = 0, len = parsedField.length; i < len-1; i++) {
-    var elem = parsedField[i];
-    doc = doc[elem] = doc[elem] || {};
-  }
-  doc[parsedField[len-1]] = value;
-}
-
-function compare(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-// Converts a string in dot notation to an array of its components, with backslash escaping
-function parseField(fieldName) {
-  // fields may be deep (e.g. "foo.bar.baz"), so parse
-  var fields = [];
-  var current = '';
-  for (var i = 0, len = fieldName.length; i < len; i++) {
-    var ch = fieldName[i];
-    if (ch === '.') {
-      if (i > 0 && fieldName[i - 1] === '\\') { // escaped delimiter
-        current = current.substring(0, current.length - 1) + '.';
-      } else { // not escaped, so delimiter
-        fields.push(current);
-        current = '';
-      }
-    } else { // normal character
-      current += ch;
-    }
-  }
-  fields.push(current);
-  return fields;
-}
-
-var combinationFields = ['$or', '$nor', '$not'];
-function isCombinationalField(field) {
-  return combinationFields.indexOf(field) > -1;
-}
-
-function getKey(obj) {
-  return Object.keys(obj)[0];
-}
-
-function getValue(obj) {
-  return obj[getKey(obj)];
-}
-
-
-// flatten an array of selectors joined by an $and operator
-function mergeAndedSelectors(selectors) {
-
-  // sort to ensure that e.g. if the user specified
-  // $and: [{$gt: 'a'}, {$gt: 'b'}], then it's collapsed into
-  // just {$gt: 'b'}
-  var res = {};
-
-  selectors.forEach(function (selector) {
-    Object.keys(selector).forEach(function (field) {
-      var matcher = selector[field];
-      if (typeof matcher !== 'object') {
-        matcher = {$eq: matcher};
-      }
-
-      if (isCombinationalField(field)) {
-        if (matcher instanceof Array) {
-          res[field] = matcher.map(function (m) {
-            return mergeAndedSelectors([m]);
-          });
-        } else {
-          res[field] = mergeAndedSelectors([matcher]);
-        }
-      } else {
-        var fieldMatchers = res[field] = res[field] || {};
-        Object.keys(matcher).forEach(function (operator) {
-          var value = matcher[operator];
-
-          if (operator === '$gt' || operator === '$gte') {
-            return mergeGtGte(operator, value, fieldMatchers);
-          } else if (operator === '$lt' || operator === '$lte') {
-            return mergeLtLte(operator, value, fieldMatchers);
-          } else if (operator === '$ne') {
-            return mergeNe(value, fieldMatchers);
-          } else if (operator === '$eq') {
-            return mergeEq(value, fieldMatchers);
-          }
-          fieldMatchers[operator] = value;
-        });
-      }
-    });
-  });
-
-  return res;
-}
-
-
-
-// collapse logically equivalent gt/gte values
-function mergeGtGte(operator, value, fieldMatchers) {
-  if (typeof fieldMatchers.$eq !== 'undefined') {
-    return; // do nothing
-  }
-  if (typeof fieldMatchers.$gte !== 'undefined') {
-    if (operator === '$gte') {
-      if (value > fieldMatchers.$gte) { // more specificity
-        fieldMatchers.$gte = value;
-      }
-    } else { // operator === '$gt'
-      if (value >= fieldMatchers.$gte) { // more specificity
-        delete fieldMatchers.$gte;
-        fieldMatchers.$gt = value;
-      }
-    }
-  } else if (typeof fieldMatchers.$gt !== 'undefined') {
-    if (operator === '$gte') {
-      if (value > fieldMatchers.$gt) { // more specificity
-        delete fieldMatchers.$gt;
-        fieldMatchers.$gte = value;
-      }
-    } else { // operator === '$gt'
-      if (value > fieldMatchers.$gt) { // more specificity
-        fieldMatchers.$gt = value;
-      }
-    }
-  } else {
-    fieldMatchers[operator] = value;
-  }
-}
-
-// collapse logically equivalent lt/lte values
-function mergeLtLte(operator, value, fieldMatchers) {
-  if (typeof fieldMatchers.$eq !== 'undefined') {
-    return; // do nothing
-  }
-  if (typeof fieldMatchers.$lte !== 'undefined') {
-    if (operator === '$lte') {
-      if (value < fieldMatchers.$lte) { // more specificity
-        fieldMatchers.$lte = value;
-      }
-    } else { // operator === '$gt'
-      if (value <= fieldMatchers.$lte) { // more specificity
-        delete fieldMatchers.$lte;
-        fieldMatchers.$lt = value;
-      }
-    }
-  } else if (typeof fieldMatchers.$lt !== 'undefined') {
-    if (operator === '$lte') {
-      if (value < fieldMatchers.$lt) { // more specificity
-        delete fieldMatchers.$lt;
-        fieldMatchers.$lte = value;
-      }
-    } else { // operator === '$gt'
-      if (value < fieldMatchers.$lt) { // more specificity
-        fieldMatchers.$lt = value;
-      }
-    }
-  } else {
-    fieldMatchers[operator] = value;
-  }
-}
-
-// combine $ne values into one array
-function mergeNe(value, fieldMatchers) {
-  if ('$ne' in fieldMatchers) {
-    // there are many things this could "not" be
-    fieldMatchers.$ne.push(value);
-  } else { // doesn't exist yet
-    fieldMatchers.$ne = [value];
-  }
-}
-
-// add $eq into the mix
-function mergeEq(value, fieldMatchers) {
-  // these all have less specificity than the $eq
-  // TODO: check for user errors here
-  delete fieldMatchers.$gt;
-  delete fieldMatchers.$gte;
-  delete fieldMatchers.$lt;
-  delete fieldMatchers.$lte;
-  delete fieldMatchers.$ne;
-  fieldMatchers.$eq = value;
-}
-
-//#7458: execute function mergeAndedSelectors on nested $and
-function mergeAndedSelectorsNested(obj) {
-    for (var prop in obj) {
-        if (Array.isArray(obj)) {
-            for (var i in obj) {
-                if (obj[i]['$and']) {
-                    obj[i] = mergeAndedSelectors(obj[i]['$and']);
-                }
-            }
-        }
-        var value = obj[prop];
-        if (typeof value === 'object') {
-            mergeAndedSelectorsNested(value); // <- recursive call
-        }
-    }
-    return obj;
-}
-
-//#7458: determine id $and is present in selector (at any level)
-function isAndInSelector(obj, isAnd) {
-    for (var prop in obj) {
-        if (prop === '$and') {
-            isAnd = true;
-        }
-        var value = obj[prop];
-        if (typeof value === 'object') {
-            isAnd = isAndInSelector(value, isAnd); // <- recursive call
-        }
-    }
-    return isAnd;
-}
-
-//
-// normalize the selector
-//
-function massageSelector(input) {
-  var result = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_0__.clone)(input);
-  var wasAnded = false;
-    //#7458: if $and is present in selector (at any level) merge nested $and
-    if (isAndInSelector(result, false)) {
-        result = mergeAndedSelectorsNested(result);
-        if ('$and' in result) {
-            result = mergeAndedSelectors(result['$and']);
-        }
-        wasAnded = true;
-    }
-
-  ['$or', '$nor'].forEach(function (orOrNor) {
-    if (orOrNor in result) {
-      // message each individual selector
-      // e.g. {foo: 'bar'} becomes {foo: {$eq: 'bar'}}
-      result[orOrNor].forEach(function (subSelector) {
-        var fields = Object.keys(subSelector);
-        for (var i = 0; i < fields.length; i++) {
-          var field = fields[i];
-          var matcher = subSelector[field];
-          if (typeof matcher !== 'object' || matcher === null) {
-            subSelector[field] = {$eq: matcher};
-          }
-        }
-      });
-    }
-  });
-
-  if ('$not' in result) {
-    //This feels a little like forcing, but it will work for now,
-    //I would like to come back to this and make the merging of selectors a little more generic
-    result['$not'] = mergeAndedSelectors([result['$not']]);
-  }
-
-  var fields = Object.keys(result);
-
-  for (var i = 0; i < fields.length; i++) {
-    var field = fields[i];
-    var matcher = result[field];
-
-    if (typeof matcher !== 'object' || matcher === null) {
-      matcher = {$eq: matcher};
-    } else if ('$ne' in matcher && !wasAnded) {
-      // I put these in an array, since there may be more than one
-      // but in the "mergeAnded" operation, I already take care of that
-      matcher.$ne = [matcher.$ne];
-    }
-    result[field] = matcher;
-  }
-
-  return result;
-}
-
-// create a comparator based on the sort object
-function createFieldSorter(sort) {
-
-  function getFieldValuesAsArray(doc) {
-    return sort.map(function (sorting) {
-      var fieldName = getKey(sorting);
-      var parsedField = parseField(fieldName);
-      var docFieldValue = getFieldFromDoc(doc, parsedField);
-      return docFieldValue;
-    });
-  }
-
-  return function (aRow, bRow) {
-    var aFieldValues = getFieldValuesAsArray(aRow.doc);
-    var bFieldValues = getFieldValuesAsArray(bRow.doc);
-    var collation = (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(aFieldValues, bFieldValues);
-    if (collation !== 0) {
-      return collation;
-    }
-    // this is what mango seems to do
-    return compare(aRow.doc._id, bRow.doc._id);
-  };
-}
-
-function filterInMemoryFields(rows, requestDef, inMemoryFields) {
-  rows = rows.filter(function (row) {
-    return rowFilter(row.doc, requestDef.selector, inMemoryFields);
-  });
-
-  if (requestDef.sort) {
-    // in-memory sort
-    var fieldSorter = createFieldSorter(requestDef.sort);
-    rows = rows.sort(fieldSorter);
-    if (typeof requestDef.sort[0] !== 'string' &&
-        getValue(requestDef.sort[0]) === 'desc') {
-      rows = rows.reverse();
-    }
-  }
-
-  if ('limit' in requestDef || 'skip' in requestDef) {
-    // have to do the limit in-memory
-    var skip = requestDef.skip || 0;
-    var limit = ('limit' in requestDef ? requestDef.limit : rows.length) + skip;
-    rows = rows.slice(skip, limit);
-  }
-  return rows;
-}
-
-function rowFilter(doc, selector, inMemoryFields) {
-  return inMemoryFields.every(function (field) {
-    var matcher = selector[field];
-    var parsedField = parseField(field);
-    var docFieldValue = getFieldFromDoc(doc, parsedField);
-    if (isCombinationalField(field)) {
-      return matchCominationalSelector(field, matcher, doc);
-    }
-
-    return matchSelector(matcher, doc, parsedField, docFieldValue);
-  });
-}
-
-function matchSelector(matcher, doc, parsedField, docFieldValue) {
-  if (!matcher) {
-    // no filtering necessary; this field is just needed for sorting
-    return true;
-  }
-
-  // is matcher an object, if so continue recursion
-  if (typeof matcher === 'object') {
-    return Object.keys(matcher).every(function (userOperator) {
-      var userValue = matcher[userOperator];
-      return match(userOperator, doc, userValue, parsedField, docFieldValue);
-    });
-  }
-
-  // no more depth, No need to recurse further
-  return matcher === docFieldValue;
-}
-
-function matchCominationalSelector(field, matcher, doc) {
-
-  if (field === '$or') {
-    return matcher.some(function (orMatchers) {
-      return rowFilter(doc, orMatchers, Object.keys(orMatchers));
-    });
-  }
-
-  if (field === '$not') {
-    return !rowFilter(doc, matcher, Object.keys(matcher));
-  }
-
-  //`$nor`
-  return !matcher.find(function (orMatchers) {
-    return rowFilter(doc, orMatchers, Object.keys(orMatchers));
-  });
-
-}
-
-function match(userOperator, doc, userValue, parsedField, docFieldValue) {
-  if (!matchers[userOperator]) {
-    throw new Error('unknown operator "' + userOperator +
-      '" - should be one of $eq, $lte, $lt, $gt, $gte, $exists, $ne, $in, ' +
-      '$nin, $size, $mod, $regex, $elemMatch, $type, $allMatch or $all');
-  }
-  return matchers[userOperator](doc, userValue, parsedField, docFieldValue);
-}
-
-function fieldExists(docFieldValue) {
-  return typeof docFieldValue !== 'undefined' && docFieldValue !== null;
-}
-
-function fieldIsNotUndefined(docFieldValue) {
-  return typeof docFieldValue !== 'undefined';
-}
-
-function modField(docFieldValue, userValue) {
-  var divisor = userValue[0];
-  var mod = userValue[1];
-  if (divisor === 0) {
-    throw new Error('Bad divisor, cannot divide by zero');
-  }
-
-  if (parseInt(divisor, 10) !== divisor ) {
-    throw new Error('Divisor is not an integer');
-  }
-
-  if (parseInt(mod, 10) !== mod ) {
-    throw new Error('Modulus is not an integer');
-  }
-
-  if (parseInt(docFieldValue, 10) !== docFieldValue) {
-    return false;
-  }
-
-  return docFieldValue % divisor === mod;
-}
-
-function arrayContainsValue(docFieldValue, userValue) {
-  return userValue.some(function (val) {
-    if (docFieldValue instanceof Array) {
-      return docFieldValue.indexOf(val) > -1;
-    }
-
-    return docFieldValue === val;
-  });
-}
-
-function arrayContainsAllValues(docFieldValue, userValue) {
-  return userValue.every(function (val) {
-    return docFieldValue.indexOf(val) > -1;
-  });
-}
-
-function arraySize(docFieldValue, userValue) {
-  return docFieldValue.length === userValue;
-}
-
-function regexMatch(docFieldValue, userValue) {
-  var re = new RegExp(userValue);
-
-  return re.test(docFieldValue);
-}
-
-function typeMatch(docFieldValue, userValue) {
-
-  switch (userValue) {
-    case 'null':
-      return docFieldValue === null;
-    case 'boolean':
-      return typeof (docFieldValue) === 'boolean';
-    case 'number':
-      return typeof (docFieldValue) === 'number';
-    case 'string':
-      return typeof (docFieldValue) === 'string';
-    case 'array':
-      return docFieldValue instanceof Array;
-    case 'object':
-      return ({}).toString.call(docFieldValue) === '[object Object]';
-  }
-
-  throw new Error(userValue + ' not supported as a type.' +
-                  'Please use one of object, string, array, number, boolean or null.');
-
-}
-
-var matchers = {
-
-  '$elemMatch': function (doc, userValue, parsedField, docFieldValue) {
-    if (!Array.isArray(docFieldValue)) {
-      return false;
-    }
-
-    if (docFieldValue.length === 0) {
-      return false;
-    }
-
-    if (typeof docFieldValue[0] === 'object') {
-      return docFieldValue.some(function (val) {
-        return rowFilter(val, userValue, Object.keys(userValue));
-      });
-    }
-
-    return docFieldValue.some(function (val) {
-      return matchSelector(userValue, doc, parsedField, val);
-    });
-  },
-
-  '$allMatch': function (doc, userValue, parsedField, docFieldValue) {
-    if (!Array.isArray(docFieldValue)) {
-      return false;
-    }
-
-    /* istanbul ignore next */
-    if (docFieldValue.length === 0) {
-      return false;
-    }
-
-    if (typeof docFieldValue[0] === 'object') {
-      return docFieldValue.every(function (val) {
-        return rowFilter(val, userValue, Object.keys(userValue));
-      });
-    }
-
-    return docFieldValue.every(function (val) {
-      return matchSelector(userValue, doc, parsedField, val);
-    });
-  },
-
-  '$eq': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) === 0;
-  },
-
-  '$gte': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) >= 0;
-  },
-
-  '$gt': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) > 0;
-  },
-
-  '$lte': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) <= 0;
-  },
-
-  '$lt': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) < 0;
-  },
-
-  '$exists': function (doc, userValue, parsedField, docFieldValue) {
-    //a field that is null is still considered to exist
-    if (userValue) {
-      return fieldIsNotUndefined(docFieldValue);
-    }
-
-    return !fieldIsNotUndefined(docFieldValue);
-  },
-
-  '$mod': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldExists(docFieldValue) && modField(docFieldValue, userValue);
-  },
-
-  '$ne': function (doc, userValue, parsedField, docFieldValue) {
-    return userValue.every(function (neValue) {
-      return (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, neValue) !== 0;
-    });
-  },
-  '$in': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldExists(docFieldValue) && arrayContainsValue(docFieldValue, userValue);
-  },
-
-  '$nin': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldExists(docFieldValue) && !arrayContainsValue(docFieldValue, userValue);
-  },
-
-  '$size': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldExists(docFieldValue) && arraySize(docFieldValue, userValue);
-  },
-
-  '$all': function (doc, userValue, parsedField, docFieldValue) {
-    return Array.isArray(docFieldValue) && arrayContainsAllValues(docFieldValue, userValue);
-  },
-
-  '$regex': function (doc, userValue, parsedField, docFieldValue) {
-    return fieldExists(docFieldValue) && regexMatch(docFieldValue, userValue);
-  },
-
-  '$type': function (doc, userValue, parsedField, docFieldValue) {
-    return typeMatch(docFieldValue, userValue);
-  }
-};
-
-// return true if the given doc matches the supplied selector
-function matchesSelector(doc, selector) {
-  /* istanbul ignore if */
-  if (typeof selector !== 'object') {
-    // match the CouchDB error message
-    throw new Error('Selector error: expected a JSON object');
-  }
-
-  selector = massageSelector(selector);
-  var row = {
-    'doc': doc
-  };
-
-  var rowsMatched = filterInMemoryFields([row], { 'selector': selector }, Object.keys(selector));
-  return rowsMatched && rowsMatched.length === 1;
-}
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb-utils/lib/index-browser.es.js":
-/*!************************************************************!*\
-  !*** ./node_modules/pouchdb-utils/lib/index-browser.es.js ***!
-  \************************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "adapterFun": () => (/* binding */ adapterFun),
-/* harmony export */   "assign": () => (/* binding */ assign$1),
-/* harmony export */   "bulkGetShim": () => (/* binding */ bulkGet),
-/* harmony export */   "changesHandler": () => (/* binding */ Changes),
-/* harmony export */   "clone": () => (/* binding */ clone),
-/* harmony export */   "defaultBackOff": () => (/* binding */ defaultBackOff),
-/* harmony export */   "explainError": () => (/* binding */ explainError),
-/* harmony export */   "filterChange": () => (/* binding */ filterChange),
-/* harmony export */   "flatten": () => (/* binding */ flatten),
-/* harmony export */   "functionName": () => (/* binding */ res$1),
-/* harmony export */   "guardedConsole": () => (/* binding */ guardedConsole),
-/* harmony export */   "hasLocalStorage": () => (/* binding */ hasLocalStorage),
-/* harmony export */   "invalidIdError": () => (/* binding */ invalidIdError),
-/* harmony export */   "isRemote": () => (/* binding */ isRemote),
-/* harmony export */   "listenerCount": () => (/* binding */ listenerCount),
-/* harmony export */   "nextTick": () => (/* reexport default from dynamic */ immediate__WEBPACK_IMPORTED_MODULE_3___default.a),
-/* harmony export */   "normalizeDdocFunctionName": () => (/* binding */ normalizeDesignDocFunctionName),
-/* harmony export */   "once": () => (/* binding */ once),
-/* harmony export */   "parseDdocFunctionName": () => (/* binding */ parseDesignDocFunctionName),
-/* harmony export */   "parseUri": () => (/* binding */ parseUri),
-/* harmony export */   "pick": () => (/* binding */ pick),
-/* harmony export */   "rev": () => (/* binding */ rev),
-/* harmony export */   "scopeEval": () => (/* binding */ scopeEval),
-/* harmony export */   "toPromise": () => (/* binding */ toPromise),
-/* harmony export */   "upsert": () => (/* binding */ upsert),
-/* harmony export */   "uuid": () => (/* binding */ uuid)
-/* harmony export */ });
-/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! argsarray */ "./node_modules/argsarray/index.js");
-/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(argsarray__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var pouchdb_collections__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-collections */ "./node_modules/pouchdb-collections/lib/index.es.js");
-/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! inherits */ "./node_modules/inherits/inherits_browser.js");
-/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(inherits__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony import */ var immediate__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! immediate */ "./node_modules/immediate/lib/index.js");
-/* harmony import */ var immediate__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(immediate__WEBPACK_IMPORTED_MODULE_3__);
-/* harmony import */ var pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! pouchdb-errors */ "./node_modules/pouchdb-errors/lib/index.es.js");
-/* harmony import */ var events__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! events */ "./node_modules/events/events.js");
-/* harmony import */ var events__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(events__WEBPACK_IMPORTED_MODULE_5__);
-/* harmony import */ var uuid__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! uuid */ "./node_modules/uuid/wrapper.mjs");
-/* harmony import */ var pouchdb_md5__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! pouchdb-md5 */ "./node_modules/pouchdb-md5/lib/index-browser.es.js");
-
-
-
-
-
-
-
-
-
-function isBinaryObject(object) {
-  return (typeof ArrayBuffer !== 'undefined' && object instanceof ArrayBuffer) ||
-    (typeof Blob !== 'undefined' && object instanceof Blob);
-}
-
-function cloneArrayBuffer(buff) {
-  if (typeof buff.slice === 'function') {
-    return buff.slice(0);
-  }
-  // IE10-11 slice() polyfill
-  var target = new ArrayBuffer(buff.byteLength);
-  var targetArray = new Uint8Array(target);
-  var sourceArray = new Uint8Array(buff);
-  targetArray.set(sourceArray);
-  return target;
-}
-
-function cloneBinaryObject(object) {
-  if (object instanceof ArrayBuffer) {
-    return cloneArrayBuffer(object);
-  }
-  var size = object.size;
-  var type = object.type;
-  // Blob
-  if (typeof object.slice === 'function') {
-    return object.slice(0, size, type);
-  }
-  // PhantomJS slice() replacement
-  return object.webkitSlice(0, size, type);
-}
-
-// most of this is borrowed from lodash.isPlainObject:
-// https://github.com/fis-components/lodash.isplainobject/
-// blob/29c358140a74f252aeb08c9eb28bef86f2217d4a/index.js
-
-var funcToString = Function.prototype.toString;
-var objectCtorString = funcToString.call(Object);
-
-function isPlainObject(value) {
-  var proto = Object.getPrototypeOf(value);
-  /* istanbul ignore if */
-  if (proto === null) { // not sure when this happens, but I guess it can
-    return true;
-  }
-  var Ctor = proto.constructor;
-  return (typeof Ctor == 'function' &&
-    Ctor instanceof Ctor && funcToString.call(Ctor) == objectCtorString);
-}
-
-function clone(object) {
-  var newObject;
-  var i;
-  var len;
-
-  if (!object || typeof object !== 'object') {
-    return object;
-  }
-
-  if (Array.isArray(object)) {
-    newObject = [];
-    for (i = 0, len = object.length; i < len; i++) {
-      newObject[i] = clone(object[i]);
-    }
-    return newObject;
-  }
-
-  // special case: to avoid inconsistencies between IndexedDB
-  // and other backends, we automatically stringify Dates
-  if (object instanceof Date) {
-    return object.toISOString();
-  }
-
-  if (isBinaryObject(object)) {
-    return cloneBinaryObject(object);
-  }
-
-  if (!isPlainObject(object)) {
-    return object; // don't clone objects like Workers
-  }
-
-  newObject = {};
-  for (i in object) {
-    /* istanbul ignore else */
-    if (Object.prototype.hasOwnProperty.call(object, i)) {
-      var value = clone(object[i]);
-      if (typeof value !== 'undefined') {
-        newObject[i] = value;
-      }
-    }
-  }
-  return newObject;
-}
-
-function once(fun) {
-  var called = false;
-  return argsarray__WEBPACK_IMPORTED_MODULE_0___default()(function (args) {
-    /* istanbul ignore if */
-    if (called) {
-      // this is a smoke test and should never actually happen
-      throw new Error('once called more than once');
-    } else {
-      called = true;
-      fun.apply(this, args);
-    }
-  });
-}
-
-function toPromise(func) {
-  //create the function we will be returning
-  return argsarray__WEBPACK_IMPORTED_MODULE_0___default()(function (args) {
-    // Clone arguments
-    args = clone(args);
-    var self = this;
-    // if the last argument is a function, assume its a callback
-    var usedCB = (typeof args[args.length - 1] === 'function') ? args.pop() : false;
-    var promise = new Promise(function (fulfill, reject) {
-      var resp;
-      try {
-        var callback = once(function (err, mesg) {
-          if (err) {
-            reject(err);
-          } else {
-            fulfill(mesg);
-          }
-        });
-        // create a callback for this invocation
-        // apply the function in the orig context
-        args.push(callback);
-        resp = func.apply(self, args);
-        if (resp && typeof resp.then === 'function') {
-          fulfill(resp);
-        }
-      } catch (e) {
-        reject(e);
-      }
-    });
-    // if there is a callback, call it back
-    if (usedCB) {
-      promise.then(function (result) {
-        usedCB(null, result);
-      }, usedCB);
-    }
-    return promise;
-  });
-}
-
-function logApiCall(self, name, args) {
-  /* istanbul ignore if */
-  if (self.constructor.listeners('debug').length) {
-    var logArgs = ['api', self.name, name];
-    for (var i = 0; i < args.length - 1; i++) {
-      logArgs.push(args[i]);
-    }
-    self.constructor.emit('debug', logArgs);
-
-    // override the callback itself to log the response
-    var origCallback = args[args.length - 1];
-    args[args.length - 1] = function (err, res) {
-      var responseArgs = ['api', self.name, name];
-      responseArgs = responseArgs.concat(
-        err ? ['error', err] : ['success', res]
-      );
-      self.constructor.emit('debug', responseArgs);
-      origCallback(err, res);
-    };
-  }
-}
-
-function adapterFun(name, callback) {
-  return toPromise(argsarray__WEBPACK_IMPORTED_MODULE_0___default()(function (args) {
-    if (this._closed) {
-      return Promise.reject(new Error('database is closed'));
-    }
-    if (this._destroyed) {
-      return Promise.reject(new Error('database is destroyed'));
-    }
-    var self = this;
-    logApiCall(self, name, args);
-    if (!this.taskqueue.isReady) {
-      return new Promise(function (fulfill, reject) {
-        self.taskqueue.addTask(function (failed) {
-          if (failed) {
-            reject(failed);
-          } else {
-            fulfill(self[name].apply(self, args));
-          }
-        });
-      });
-    }
-    return callback.apply(this, args);
-  }));
-}
-
-// like underscore/lodash _.pick()
-function pick(obj, arr) {
-  var res = {};
-  for (var i = 0, len = arr.length; i < len; i++) {
-    var prop = arr[i];
-    if (prop in obj) {
-      res[prop] = obj[prop];
-    }
-  }
-  return res;
-}
-
-// Most browsers throttle concurrent requests at 6, so it's silly
-// to shim _bulk_get by trying to launch potentially hundreds of requests
-// and then letting the majority time out. We can handle this ourselves.
-var MAX_NUM_CONCURRENT_REQUESTS = 6;
-
-function identityFunction(x) {
-  return x;
-}
-
-function formatResultForOpenRevsGet(result) {
-  return [{
-    ok: result
-  }];
-}
-
-// shim for P/CouchDB adapters that don't directly implement _bulk_get
-function bulkGet(db, opts, callback) {
-  var requests = opts.docs;
-
-  // consolidate into one request per doc if possible
-  var requestsById = new pouchdb_collections__WEBPACK_IMPORTED_MODULE_1__.Map();
-  requests.forEach(function (request) {
-    if (requestsById.has(request.id)) {
-      requestsById.get(request.id).push(request);
-    } else {
-      requestsById.set(request.id, [request]);
-    }
-  });
-
-  var numDocs = requestsById.size;
-  var numDone = 0;
-  var perDocResults = new Array(numDocs);
-
-  function collapseResultsAndFinish() {
-    var results = [];
-    perDocResults.forEach(function (res) {
-      res.docs.forEach(function (info) {
-        results.push({
-          id: res.id,
-          docs: [info]
-        });
-      });
-    });
-    callback(null, {results: results});
-  }
-
-  function checkDone() {
-    if (++numDone === numDocs) {
-      collapseResultsAndFinish();
-    }
-  }
-
-  function gotResult(docIndex, id, docs) {
-    perDocResults[docIndex] = {id: id, docs: docs};
-    checkDone();
-  }
-
-  var allRequests = [];
-  requestsById.forEach(function (value, key) {
-    allRequests.push(key);
-  });
-
-  var i = 0;
-
-  function nextBatch() {
-
-    if (i >= allRequests.length) {
-      return;
-    }
-
-    var upTo = Math.min(i + MAX_NUM_CONCURRENT_REQUESTS, allRequests.length);
-    var batch = allRequests.slice(i, upTo);
-    processBatch(batch, i);
-    i += batch.length;
-  }
-
-  function processBatch(batch, offset) {
-    batch.forEach(function (docId, j) {
-      var docIdx = offset + j;
-      var docRequests = requestsById.get(docId);
-
-      // just use the first request as the "template"
-      // TODO: The _bulk_get API allows for more subtle use cases than this,
-      // but for now it is unlikely that there will be a mix of different
-      // "atts_since" or "attachments" in the same request, since it's just
-      // replicate.js that is using this for the moment.
-      // Also, atts_since is aspirational, since we don't support it yet.
-      var docOpts = pick(docRequests[0], ['atts_since', 'attachments']);
-      docOpts.open_revs = docRequests.map(function (request) {
-        // rev is optional, open_revs disallowed
-        return request.rev;
-      });
-
-      // remove falsey / undefined revisions
-      docOpts.open_revs = docOpts.open_revs.filter(identityFunction);
-
-      var formatResult = identityFunction;
-
-      if (docOpts.open_revs.length === 0) {
-        delete docOpts.open_revs;
-
-        // when fetching only the "winning" leaf,
-        // transform the result so it looks like an open_revs
-        // request
-        formatResult = formatResultForOpenRevsGet;
-      }
-
-      // globally-supplied options
-      ['revs', 'attachments', 'binary', 'ajax', 'latest'].forEach(function (param) {
-        if (param in opts) {
-          docOpts[param] = opts[param];
-        }
-      });
-      db.get(docId, docOpts, function (err, res) {
-        var result;
-        /* istanbul ignore if */
-        if (err) {
-          result = [{error: err}];
-        } else {
-          result = formatResult(res);
-        }
-        gotResult(docIdx, docId, result);
-        nextBatch();
-      });
-    });
-  }
-
-  nextBatch();
-
-}
-
-var hasLocal;
-
-try {
-  localStorage.setItem('_pouch_check_localstorage', 1);
-  hasLocal = !!localStorage.getItem('_pouch_check_localstorage');
-} catch (e) {
-  hasLocal = false;
-}
-
-function hasLocalStorage() {
-  return hasLocal;
-}
-
-// Custom nextTick() shim for browsers. In node, this will just be process.nextTick(). We
-
-inherits__WEBPACK_IMPORTED_MODULE_2___default()(Changes, (events__WEBPACK_IMPORTED_MODULE_5___default()));
-
-/* istanbul ignore next */
-function attachBrowserEvents(self) {
-  if (hasLocalStorage()) {
-    addEventListener("storage", function (e) {
-      self.emit(e.key);
-    });
-  }
-}
-
-function Changes() {
-  events__WEBPACK_IMPORTED_MODULE_5___default().call(this);
-  this._listeners = {};
-
-  attachBrowserEvents(this);
-}
-Changes.prototype.addListener = function (dbName, id, db, opts) {
-  /* istanbul ignore if */
-  if (this._listeners[id]) {
-    return;
-  }
-  var self = this;
-  var inprogress = false;
-  function eventFunction() {
-    /* istanbul ignore if */
-    if (!self._listeners[id]) {
-      return;
-    }
-    if (inprogress) {
-      inprogress = 'waiting';
-      return;
-    }
-    inprogress = true;
-    var changesOpts = pick(opts, [
-      'style', 'include_docs', 'attachments', 'conflicts', 'filter',
-      'doc_ids', 'view', 'since', 'query_params', 'binary', 'return_docs'
-    ]);
-
-    /* istanbul ignore next */
-    function onError() {
-      inprogress = false;
-    }
-
-    db.changes(changesOpts).on('change', function (c) {
-      if (c.seq > opts.since && !opts.cancelled) {
-        opts.since = c.seq;
-        opts.onChange(c);
-      }
-    }).on('complete', function () {
-      if (inprogress === 'waiting') {
-        immediate__WEBPACK_IMPORTED_MODULE_3___default()(eventFunction);
-      }
-      inprogress = false;
-    }).on('error', onError);
-  }
-  this._listeners[id] = eventFunction;
-  this.on(dbName, eventFunction);
-};
-
-Changes.prototype.removeListener = function (dbName, id) {
-  /* istanbul ignore if */
-  if (!(id in this._listeners)) {
-    return;
-  }
-  events__WEBPACK_IMPORTED_MODULE_5___default().prototype.removeListener.call(this, dbName,
-    this._listeners[id]);
-  delete this._listeners[id];
-};
-
-
-/* istanbul ignore next */
-Changes.prototype.notifyLocalWindows = function (dbName) {
-  //do a useless change on a storage thing
-  //in order to get other windows's listeners to activate
-  if (hasLocalStorage()) {
-    localStorage[dbName] = (localStorage[dbName] === "a") ? "b" : "a";
-  }
-};
-
-Changes.prototype.notify = function (dbName) {
-  this.emit(dbName);
-  this.notifyLocalWindows(dbName);
-};
-
-function guardedConsole(method) {
-  /* istanbul ignore else */
-  if (typeof console !== 'undefined' && typeof console[method] === 'function') {
-    var args = Array.prototype.slice.call(arguments, 1);
-    console[method].apply(console, args);
-  }
-}
-
-function randomNumber(min, max) {
-  var maxTimeout = 600000; // Hard-coded default of 10 minutes
-  min = parseInt(min, 10) || 0;
-  max = parseInt(max, 10);
-  if (max !== max || max <= min) {
-    max = (min || 1) << 1; //doubling
-  } else {
-    max = max + 1;
-  }
-  // In order to not exceed maxTimeout, pick a random value between half of maxTimeout and maxTimeout
-  if (max > maxTimeout) {
-    min = maxTimeout >> 1; // divide by two
-    max = maxTimeout;
-  }
-  var ratio = Math.random();
-  var range = max - min;
-
-  return ~~(range * ratio + min); // ~~ coerces to an int, but fast.
-}
-
-function defaultBackOff(min) {
-  var max = 0;
-  if (!min) {
-    max = 2000;
-  }
-  return randomNumber(min, max);
-}
-
-// designed to give info to browser users, who are disturbed
-// when they see http errors in the console
-function explainError(status, str) {
-  guardedConsole('info', 'The above ' + status + ' is totally normal. ' + str);
-}
-
-var assign;
-{
-  if (typeof Object.assign === 'function') {
-    assign = Object.assign;
-  } else {
-    // lite Object.assign polyfill based on
-    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
-    assign = function (target) {
-      var to = Object(target);
-
-      for (var index = 1; index < arguments.length; index++) {
-        var nextSource = arguments[index];
-
-        if (nextSource != null) { // Skip over if undefined or null
-          for (var nextKey in nextSource) {
-            // Avoid bugs when hasOwnProperty is shadowed
-            if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
-              to[nextKey] = nextSource[nextKey];
-            }
-          }
-        }
-      }
-      return to;
-    };
-  }
-}
-
-var assign$1 = assign;
-
-function tryFilter(filter, doc, req) {
-  try {
-    return !filter(doc, req);
-  } catch (err) {
-    var msg = 'Filter function threw: ' + err.toString();
-    return (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.BAD_REQUEST, msg);
-  }
-}
-
-function filterChange(opts) {
-  var req = {};
-  var hasFilter = opts.filter && typeof opts.filter === 'function';
-  req.query = opts.query_params;
-
-  return function filter(change) {
-    if (!change.doc) {
-      // CSG sends events on the changes feed that don't have documents,
-      // this hack makes a whole lot of existing code robust.
-      change.doc = {};
-    }
-
-    var filterReturn = hasFilter && tryFilter(opts.filter, change.doc, req);
-
-    if (typeof filterReturn === 'object') {
-      return filterReturn;
-    }
-
-    if (filterReturn) {
-      return false;
-    }
-
-    if (!opts.include_docs) {
-      delete change.doc;
-    } else if (!opts.attachments) {
-      for (var att in change.doc._attachments) {
-        /* istanbul ignore else */
-        if (change.doc._attachments.hasOwnProperty(att)) {
-          change.doc._attachments[att].stub = true;
-        }
-      }
-    }
-    return true;
-  };
-}
-
-function flatten(arrs) {
-  var res = [];
-  for (var i = 0, len = arrs.length; i < len; i++) {
-    res = res.concat(arrs[i]);
-  }
-  return res;
-}
-
-// shim for Function.prototype.name,
-// for browsers that don't support it like IE
-
-/* istanbul ignore next */
-function f() {}
-
-var hasName = f.name;
-var res;
-
-// We dont run coverage in IE
-/* istanbul ignore else */
-if (hasName) {
-  res = function (fun) {
-    return fun.name;
-  };
-} else {
-  res = function (fun) {
-    var match = fun.toString().match(/^\s*function\s*(?:(\S+)\s*)?\(/);
-    if (match && match[1]) {
-      return match[1];
-    }
-    else {
-      return '';
-    }
-  };
-}
-
-var res$1 = res;
-
-// Determine id an ID is valid
-//   - invalid IDs begin with an underescore that does not begin '_design' or
-//     '_local'
-//   - any other string value is a valid id
-// Returns the specific error object for each case
-function invalidIdError(id) {
-  var err;
-  if (!id) {
-    err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.MISSING_ID);
-  } else if (typeof id !== 'string') {
-    err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.INVALID_ID);
-  } else if (/^_/.test(id) && !(/^_(design|local)/).test(id)) {
-    err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.RESERVED_ID);
-  }
-  if (err) {
-    throw err;
-  }
-}
-
-// Checks if a PouchDB object is "remote" or not. This is
-
-function isRemote(db) {
-  if (typeof db._remote === 'boolean') {
-    return db._remote;
-  }
-  /* istanbul ignore next */
-  if (typeof db.type === 'function') {
-    guardedConsole('warn',
-      'db.type() is deprecated and will be removed in ' +
-      'a future version of PouchDB');
-    return db.type() === 'http';
-  }
-  /* istanbul ignore next */
-  return false;
-}
-
-function listenerCount(ee, type) {
-  return 'listenerCount' in ee ? ee.listenerCount(type) :
-                                 events__WEBPACK_IMPORTED_MODULE_5___default().listenerCount(ee, type);
-}
-
-function parseDesignDocFunctionName(s) {
-  if (!s) {
-    return null;
-  }
-  var parts = s.split('/');
-  if (parts.length === 2) {
-    return parts;
-  }
-  if (parts.length === 1) {
-    return [s, s];
-  }
-  return null;
-}
-
-function normalizeDesignDocFunctionName(s) {
-  var normalized = parseDesignDocFunctionName(s);
-  return normalized ? normalized.join('/') : null;
-}
-
-// originally parseUri 1.2.2, now patched by us
-// (c) Steven Levithan <stevenlevithan.com>
-// MIT License
-var keys = ["source", "protocol", "authority", "userInfo", "user", "password",
-    "host", "port", "relative", "path", "directory", "file", "query", "anchor"];
-var qName ="queryKey";
-var qParser = /(?:^|&)([^&=]*)=?([^&]*)/g;
-
-// use the "loose" parser
-/* eslint maxlen: 0, no-useless-escape: 0 */
-var parser = /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
-
-function parseUri(str) {
-  var m = parser.exec(str);
-  var uri = {};
-  var i = 14;
-
-  while (i--) {
-    var key = keys[i];
-    var value = m[i] || "";
-    var encoded = ['user', 'password'].indexOf(key) !== -1;
-    uri[key] = encoded ? decodeURIComponent(value) : value;
-  }
-
-  uri[qName] = {};
-  uri[keys[12]].replace(qParser, function ($0, $1, $2) {
-    if ($1) {
-      uri[qName][$1] = $2;
-    }
-  });
-
-  return uri;
-}
-
-// Based on https://github.com/alexdavid/scope-eval v0.0.3
-// (source: https://unpkg.com/scope-eval@0.0.3/scope_eval.js)
-// This is basically just a wrapper around new Function()
-
-function scopeEval(source, scope) {
-  var keys = [];
-  var values = [];
-  for (var key in scope) {
-    if (scope.hasOwnProperty(key)) {
-      keys.push(key);
-      values.push(scope[key]);
-    }
-  }
-  keys.push(source);
-  return Function.apply(null, keys).apply(null, values);
-}
-
-// this is essentially the "update sugar" function from daleharvey/pouchdb#1388
-// the diffFun tells us what delta to apply to the doc.  it either returns
-// the doc, or false if it doesn't need to do an update after all
-function upsert(db, docId, diffFun) {
-  return new Promise(function (fulfill, reject) {
-    db.get(docId, function (err, doc) {
-      if (err) {
-        /* istanbul ignore next */
-        if (err.status !== 404) {
-          return reject(err);
-        }
-        doc = {};
-      }
-
-      // the user might change the _rev, so save it for posterity
-      var docRev = doc._rev;
-      var newDoc = diffFun(doc);
-
-      if (!newDoc) {
-        // if the diffFun returns falsy, we short-circuit as
-        // an optimization
-        return fulfill({updated: false, rev: docRev});
-      }
-
-      // users aren't allowed to modify these values,
-      // so reset them here
-      newDoc._id = docId;
-      newDoc._rev = docRev;
-      fulfill(tryAndPut(db, newDoc, diffFun));
-    });
-  });
-}
-
-function tryAndPut(db, doc, diffFun) {
-  return db.put(doc).then(function (res) {
-    return {
-      updated: true,
-      rev: res.rev
-    };
-  }, function (err) {
-    /* istanbul ignore next */
-    if (err.status !== 409) {
-      throw err;
-    }
-    return upsert(db, doc._id, diffFun);
-  });
-}
-
-function rev(doc, deterministic_revs) {
-  var clonedDoc = clone(doc);
-  if (!deterministic_revs) {
-    return (0,uuid__WEBPACK_IMPORTED_MODULE_7__.v4)().replace(/-/g, '').toLowerCase();
-  }
-
-  delete clonedDoc._rev_tree;
-  return (0,pouchdb_md5__WEBPACK_IMPORTED_MODULE_6__.stringMd5)(JSON.stringify(clonedDoc));
-}
-
-var uuid = uuid__WEBPACK_IMPORTED_MODULE_7__.v4; // mimic old import, only v4 is ever used elsewhere
-
-
-
-
-/***/ }),
-
-/***/ "./node_modules/pouchdb/lib/index-browser.es.js":
-/*!******************************************************!*\
-  !*** ./node_modules/pouchdb/lib/index-browser.es.js ***!
+  !*** ./node_modules/pouchdb-browser/lib/index.es.js ***!
   \******************************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
@@ -16154,9 +12327,3834 @@ PouchDB.plugin(IDBPouch)
   .plugin(mapreduce)
   .plugin(replication);
 
-// Pull from src because pouchdb-node/pouchdb-browser themselves
-
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (PouchDB);
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-collate/lib/index.es.js":
+/*!******************************************************!*\
+  !*** ./node_modules/pouchdb-collate/lib/index.es.js ***!
+  \******************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "collate": () => (/* binding */ collate),
+/* harmony export */   "normalizeKey": () => (/* binding */ normalizeKey),
+/* harmony export */   "toIndexableString": () => (/* binding */ toIndexableString),
+/* harmony export */   "parseIndexableString": () => (/* binding */ parseIndexableString)
+/* harmony export */ });
+function pad(str, padWith, upToLength) {
+  var padding = '';
+  var targetLength = upToLength - str.length;
+  /* istanbul ignore next */
+  while (padding.length < targetLength) {
+    padding += padWith;
+  }
+  return padding;
+}
+
+function padLeft(str, padWith, upToLength) {
+  var padding = pad(str, padWith, upToLength);
+  return padding + str;
+}
+
+var MIN_MAGNITUDE = -324; // verified by -Number.MIN_VALUE
+var MAGNITUDE_DIGITS = 3; // ditto
+var SEP = ''; // set to '_' for easier debugging 
+
+function collate(a, b) {
+
+  if (a === b) {
+    return 0;
+  }
+
+  a = normalizeKey(a);
+  b = normalizeKey(b);
+
+  var ai = collationIndex(a);
+  var bi = collationIndex(b);
+  if ((ai - bi) !== 0) {
+    return ai - bi;
+  }
+  switch (typeof a) {
+    case 'number':
+      return a - b;
+    case 'boolean':
+      return a < b ? -1 : 1;
+    case 'string':
+      return stringCollate(a, b);
+  }
+  return Array.isArray(a) ? arrayCollate(a, b) : objectCollate(a, b);
+}
+
+// couch considers null/NaN/Infinity/-Infinity === undefined,
+// for the purposes of mapreduce indexes. also, dates get stringified.
+function normalizeKey(key) {
+  switch (typeof key) {
+    case 'undefined':
+      return null;
+    case 'number':
+      if (key === Infinity || key === -Infinity || isNaN(key)) {
+        return null;
+      }
+      return key;
+    case 'object':
+      var origKey = key;
+      if (Array.isArray(key)) {
+        var len = key.length;
+        key = new Array(len);
+        for (var i = 0; i < len; i++) {
+          key[i] = normalizeKey(origKey[i]);
+        }
+      /* istanbul ignore next */
+      } else if (key instanceof Date) {
+        return key.toJSON();
+      } else if (key !== null) { // generic object
+        key = {};
+        for (var k in origKey) {
+          if (origKey.hasOwnProperty(k)) {
+            var val = origKey[k];
+            if (typeof val !== 'undefined') {
+              key[k] = normalizeKey(val);
+            }
+          }
+        }
+      }
+  }
+  return key;
+}
+
+function indexify(key) {
+  if (key !== null) {
+    switch (typeof key) {
+      case 'boolean':
+        return key ? 1 : 0;
+      case 'number':
+        return numToIndexableString(key);
+      case 'string':
+        // We've to be sure that key does not contain \u0000
+        // Do order-preserving replacements:
+        // 0 -> 1, 1
+        // 1 -> 1, 2
+        // 2 -> 2, 2
+        /* eslint-disable no-control-regex */
+        return key
+          .replace(/\u0002/g, '\u0002\u0002')
+          .replace(/\u0001/g, '\u0001\u0002')
+          .replace(/\u0000/g, '\u0001\u0001');
+        /* eslint-enable no-control-regex */
+      case 'object':
+        var isArray = Array.isArray(key);
+        var arr = isArray ? key : Object.keys(key);
+        var i = -1;
+        var len = arr.length;
+        var result = '';
+        if (isArray) {
+          while (++i < len) {
+            result += toIndexableString(arr[i]);
+          }
+        } else {
+          while (++i < len) {
+            var objKey = arr[i];
+            result += toIndexableString(objKey) +
+                toIndexableString(key[objKey]);
+          }
+        }
+        return result;
+    }
+  }
+  return '';
+}
+
+// convert the given key to a string that would be appropriate
+// for lexical sorting, e.g. within a database, where the
+// sorting is the same given by the collate() function.
+function toIndexableString(key) {
+  var zero = '\u0000';
+  key = normalizeKey(key);
+  return collationIndex(key) + SEP + indexify(key) + zero;
+}
+
+function parseNumber(str, i) {
+  var originalIdx = i;
+  var num;
+  var zero = str[i] === '1';
+  if (zero) {
+    num = 0;
+    i++;
+  } else {
+    var neg = str[i] === '0';
+    i++;
+    var numAsString = '';
+    var magAsString = str.substring(i, i + MAGNITUDE_DIGITS);
+    var magnitude = parseInt(magAsString, 10) + MIN_MAGNITUDE;
+    /* istanbul ignore next */
+    if (neg) {
+      magnitude = -magnitude;
+    }
+    i += MAGNITUDE_DIGITS;
+    while (true) {
+      var ch = str[i];
+      if (ch === '\u0000') {
+        break;
+      } else {
+        numAsString += ch;
+      }
+      i++;
+    }
+    numAsString = numAsString.split('.');
+    if (numAsString.length === 1) {
+      num = parseInt(numAsString, 10);
+    } else {
+      /* istanbul ignore next */
+      num = parseFloat(numAsString[0] + '.' + numAsString[1]);
+    }
+    /* istanbul ignore next */
+    if (neg) {
+      num = num - 10;
+    }
+    /* istanbul ignore next */
+    if (magnitude !== 0) {
+      // parseFloat is more reliable than pow due to rounding errors
+      // e.g. Number.MAX_VALUE would return Infinity if we did
+      // num * Math.pow(10, magnitude);
+      num = parseFloat(num + 'e' + magnitude);
+    }
+  }
+  return {num: num, length : i - originalIdx};
+}
+
+// move up the stack while parsing
+// this function moved outside of parseIndexableString for performance
+function pop(stack, metaStack) {
+  var obj = stack.pop();
+
+  if (metaStack.length) {
+    var lastMetaElement = metaStack[metaStack.length - 1];
+    if (obj === lastMetaElement.element) {
+      // popping a meta-element, e.g. an object whose value is another object
+      metaStack.pop();
+      lastMetaElement = metaStack[metaStack.length - 1];
+    }
+    var element = lastMetaElement.element;
+    var lastElementIndex = lastMetaElement.index;
+    if (Array.isArray(element)) {
+      element.push(obj);
+    } else if (lastElementIndex === stack.length - 2) { // obj with key+value
+      var key = stack.pop();
+      element[key] = obj;
+    } else {
+      stack.push(obj); // obj with key only
+    }
+  }
+}
+
+function parseIndexableString(str) {
+  var stack = [];
+  var metaStack = []; // stack for arrays and objects
+  var i = 0;
+
+  /*eslint no-constant-condition: ["error", { "checkLoops": false }]*/
+  while (true) {
+    var collationIndex = str[i++];
+    if (collationIndex === '\u0000') {
+      if (stack.length === 1) {
+        return stack.pop();
+      } else {
+        pop(stack, metaStack);
+        continue;
+      }
+    }
+    switch (collationIndex) {
+      case '1':
+        stack.push(null);
+        break;
+      case '2':
+        stack.push(str[i] === '1');
+        i++;
+        break;
+      case '3':
+        var parsedNum = parseNumber(str, i);
+        stack.push(parsedNum.num);
+        i += parsedNum.length;
+        break;
+      case '4':
+        var parsedStr = '';
+        /*eslint no-constant-condition: ["error", { "checkLoops": false }]*/
+        while (true) {
+          var ch = str[i];
+          if (ch === '\u0000') {
+            break;
+          }
+          parsedStr += ch;
+          i++;
+        }
+        // perform the reverse of the order-preserving replacement
+        // algorithm (see above)
+        /* eslint-disable no-control-regex */
+        parsedStr = parsedStr.replace(/\u0001\u0001/g, '\u0000')
+          .replace(/\u0001\u0002/g, '\u0001')
+          .replace(/\u0002\u0002/g, '\u0002');
+        /* eslint-enable no-control-regex */
+        stack.push(parsedStr);
+        break;
+      case '5':
+        var arrayElement = { element: [], index: stack.length };
+        stack.push(arrayElement.element);
+        metaStack.push(arrayElement);
+        break;
+      case '6':
+        var objElement = { element: {}, index: stack.length };
+        stack.push(objElement.element);
+        metaStack.push(objElement);
+        break;
+      /* istanbul ignore next */
+      default:
+        throw new Error(
+          'bad collationIndex or unexpectedly reached end of input: ' +
+            collationIndex);
+    }
+  }
+}
+
+function arrayCollate(a, b) {
+  var len = Math.min(a.length, b.length);
+  for (var i = 0; i < len; i++) {
+    var sort = collate(a[i], b[i]);
+    if (sort !== 0) {
+      return sort;
+    }
+  }
+  return (a.length === b.length) ? 0 :
+    (a.length > b.length) ? 1 : -1;
+}
+function stringCollate(a, b) {
+  // See: https://github.com/daleharvey/pouchdb/issues/40
+  // This is incompatible with the CouchDB implementation, but its the
+  // best we can do for now
+  return (a === b) ? 0 : ((a > b) ? 1 : -1);
+}
+function objectCollate(a, b) {
+  var ak = Object.keys(a), bk = Object.keys(b);
+  var len = Math.min(ak.length, bk.length);
+  for (var i = 0; i < len; i++) {
+    // First sort the keys
+    var sort = collate(ak[i], bk[i]);
+    if (sort !== 0) {
+      return sort;
+    }
+    // if the keys are equal sort the values
+    sort = collate(a[ak[i]], b[bk[i]]);
+    if (sort !== 0) {
+      return sort;
+    }
+
+  }
+  return (ak.length === bk.length) ? 0 :
+    (ak.length > bk.length) ? 1 : -1;
+}
+// The collation is defined by erlangs ordered terms
+// the atoms null, true, false come first, then numbers, strings,
+// arrays, then objects
+// null/undefined/NaN/Infinity/-Infinity are all considered null
+function collationIndex(x) {
+  var id = ['boolean', 'number', 'string', 'object'];
+  var idx = id.indexOf(typeof x);
+  //false if -1 otherwise true, but fast!!!!1
+  if (~idx) {
+    if (x === null) {
+      return 1;
+    }
+    if (Array.isArray(x)) {
+      return 5;
+    }
+    return idx < 3 ? (idx + 2) : (idx + 3);
+  }
+  /* istanbul ignore next */
+  if (Array.isArray(x)) {
+    return 5;
+  }
+}
+
+// conversion:
+// x yyy zz...zz
+// x = 0 for negative, 1 for 0, 2 for positive
+// y = exponent (for negative numbers negated) moved so that it's >= 0
+// z = mantisse
+function numToIndexableString(num) {
+
+  if (num === 0) {
+    return '1';
+  }
+
+  // convert number to exponential format for easier and
+  // more succinct string sorting
+  var expFormat = num.toExponential().split(/e\+?/);
+  var magnitude = parseInt(expFormat[1], 10);
+
+  var neg = num < 0;
+
+  var result = neg ? '0' : '2';
+
+  // first sort by magnitude
+  // it's easier if all magnitudes are positive
+  var magForComparison = ((neg ? -magnitude : magnitude) - MIN_MAGNITUDE);
+  var magString = padLeft((magForComparison).toString(), '0', MAGNITUDE_DIGITS);
+
+  result += SEP + magString;
+
+  // then sort by the factor
+  var factor = Math.abs(parseFloat(expFormat[0])); // [1..10)
+  /* istanbul ignore next */
+  if (neg) { // for negative reverse ordering
+    factor = 10 - factor;
+  }
+
+  var factorStr = factor.toFixed(20);
+
+  // strip zeros from the end
+  factorStr = factorStr.replace(/\.?0+$/, '');
+
+  result += SEP + factorStr;
+
+  return result;
+}
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-collections/lib/index.es.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/pouchdb-collections/lib/index.es.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Set": () => (/* binding */ ExportedSet),
+/* harmony export */   "Map": () => (/* binding */ ExportedMap)
+/* harmony export */ });
+function mangle(key) {
+  return '$' + key;
+}
+function unmangle(key) {
+  return key.substring(1);
+}
+function Map$1() {
+  this._store = {};
+}
+Map$1.prototype.get = function (key) {
+  var mangled = mangle(key);
+  return this._store[mangled];
+};
+Map$1.prototype.set = function (key, value) {
+  var mangled = mangle(key);
+  this._store[mangled] = value;
+  return true;
+};
+Map$1.prototype.has = function (key) {
+  var mangled = mangle(key);
+  return mangled in this._store;
+};
+Map$1.prototype.delete = function (key) {
+  var mangled = mangle(key);
+  var res = mangled in this._store;
+  delete this._store[mangled];
+  return res;
+};
+Map$1.prototype.forEach = function (cb) {
+  var keys = Object.keys(this._store);
+  for (var i = 0, len = keys.length; i < len; i++) {
+    var key = keys[i];
+    var value = this._store[key];
+    key = unmangle(key);
+    cb(value, key);
+  }
+};
+Object.defineProperty(Map$1.prototype, 'size', {
+  get: function () {
+    return Object.keys(this._store).length;
+  }
+});
+
+function Set$1(array) {
+  this._store = new Map$1();
+
+  // init with an array
+  if (array && Array.isArray(array)) {
+    for (var i = 0, len = array.length; i < len; i++) {
+      this.add(array[i]);
+    }
+  }
+}
+Set$1.prototype.add = function (key) {
+  return this._store.set(key, true);
+};
+Set$1.prototype.has = function (key) {
+  return this._store.has(key);
+};
+Set$1.prototype.forEach = function (cb) {
+  this._store.forEach(function (value, key) {
+    cb(key);
+  });
+};
+Object.defineProperty(Set$1.prototype, 'size', {
+  get: function () {
+    return this._store.size;
+  }
+});
+
+/* global Map,Set,Symbol */
+// Based on https://kangax.github.io/compat-table/es6/ we can sniff out
+// incomplete Map/Set implementations which would otherwise cause our tests to fail.
+// Notably they fail in IE11 and iOS 8.4, which this prevents.
+function supportsMapAndSet() {
+  if (typeof Symbol === 'undefined' || typeof Map === 'undefined' || typeof Set === 'undefined') {
+    return false;
+  }
+  var prop = Object.getOwnPropertyDescriptor(Map, Symbol.species);
+  return prop && 'get' in prop && Map[Symbol.species] === Map;
+}
+
+// based on https://github.com/montagejs/collections
+
+var ExportedSet;
+var ExportedMap;
+
+{
+  if (supportsMapAndSet()) { // prefer built-in Map/Set
+    ExportedSet = Set;
+    ExportedMap = Map;
+  } else { // fall back to our polyfill
+    ExportedSet = Set$1;
+    ExportedMap = Map$1;
+  }
+}
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-errors/lib/index.es.js":
+/*!*****************************************************!*\
+  !*** ./node_modules/pouchdb-errors/lib/index.es.js ***!
+  \*****************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "UNAUTHORIZED": () => (/* binding */ UNAUTHORIZED),
+/* harmony export */   "MISSING_BULK_DOCS": () => (/* binding */ MISSING_BULK_DOCS),
+/* harmony export */   "MISSING_DOC": () => (/* binding */ MISSING_DOC),
+/* harmony export */   "REV_CONFLICT": () => (/* binding */ REV_CONFLICT),
+/* harmony export */   "INVALID_ID": () => (/* binding */ INVALID_ID),
+/* harmony export */   "MISSING_ID": () => (/* binding */ MISSING_ID),
+/* harmony export */   "RESERVED_ID": () => (/* binding */ RESERVED_ID),
+/* harmony export */   "NOT_OPEN": () => (/* binding */ NOT_OPEN),
+/* harmony export */   "UNKNOWN_ERROR": () => (/* binding */ UNKNOWN_ERROR),
+/* harmony export */   "BAD_ARG": () => (/* binding */ BAD_ARG),
+/* harmony export */   "INVALID_REQUEST": () => (/* binding */ INVALID_REQUEST),
+/* harmony export */   "QUERY_PARSE_ERROR": () => (/* binding */ QUERY_PARSE_ERROR),
+/* harmony export */   "DOC_VALIDATION": () => (/* binding */ DOC_VALIDATION),
+/* harmony export */   "BAD_REQUEST": () => (/* binding */ BAD_REQUEST),
+/* harmony export */   "NOT_AN_OBJECT": () => (/* binding */ NOT_AN_OBJECT),
+/* harmony export */   "DB_MISSING": () => (/* binding */ DB_MISSING),
+/* harmony export */   "WSQ_ERROR": () => (/* binding */ WSQ_ERROR),
+/* harmony export */   "LDB_ERROR": () => (/* binding */ LDB_ERROR),
+/* harmony export */   "FORBIDDEN": () => (/* binding */ FORBIDDEN),
+/* harmony export */   "INVALID_REV": () => (/* binding */ INVALID_REV),
+/* harmony export */   "FILE_EXISTS": () => (/* binding */ FILE_EXISTS),
+/* harmony export */   "MISSING_STUB": () => (/* binding */ MISSING_STUB),
+/* harmony export */   "IDB_ERROR": () => (/* binding */ IDB_ERROR),
+/* harmony export */   "INVALID_URL": () => (/* binding */ INVALID_URL),
+/* harmony export */   "createError": () => (/* binding */ createError),
+/* harmony export */   "generateErrorFromResponse": () => (/* binding */ generateErrorFromResponse)
+/* harmony export */ });
+/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! inherits */ "./node_modules/inherits/inherits_browser.js");
+/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(inherits__WEBPACK_IMPORTED_MODULE_0__);
+
+
+inherits__WEBPACK_IMPORTED_MODULE_0___default()(PouchError, Error);
+
+function PouchError(status, error, reason) {
+  Error.call(this, reason);
+  this.status = status;
+  this.name = error;
+  this.message = reason;
+  this.error = true;
+}
+
+PouchError.prototype.toString = function () {
+  return JSON.stringify({
+    status: this.status,
+    name: this.name,
+    message: this.message,
+    reason: this.reason
+  });
+};
+
+var UNAUTHORIZED = new PouchError(401, 'unauthorized', "Name or password is incorrect.");
+var MISSING_BULK_DOCS = new PouchError(400, 'bad_request', "Missing JSON list of 'docs'");
+var MISSING_DOC = new PouchError(404, 'not_found', 'missing');
+var REV_CONFLICT = new PouchError(409, 'conflict', 'Document update conflict');
+var INVALID_ID = new PouchError(400, 'bad_request', '_id field must contain a string');
+var MISSING_ID = new PouchError(412, 'missing_id', '_id is required for puts');
+var RESERVED_ID = new PouchError(400, 'bad_request', 'Only reserved document ids may start with underscore.');
+var NOT_OPEN = new PouchError(412, 'precondition_failed', 'Database not open');
+var UNKNOWN_ERROR = new PouchError(500, 'unknown_error', 'Database encountered an unknown error');
+var BAD_ARG = new PouchError(500, 'badarg', 'Some query argument is invalid');
+var INVALID_REQUEST = new PouchError(400, 'invalid_request', 'Request was invalid');
+var QUERY_PARSE_ERROR = new PouchError(400, 'query_parse_error', 'Some query parameter is invalid');
+var DOC_VALIDATION = new PouchError(500, 'doc_validation', 'Bad special document member');
+var BAD_REQUEST = new PouchError(400, 'bad_request', 'Something wrong with the request');
+var NOT_AN_OBJECT = new PouchError(400, 'bad_request', 'Document must be a JSON object');
+var DB_MISSING = new PouchError(404, 'not_found', 'Database not found');
+var IDB_ERROR = new PouchError(500, 'indexed_db_went_bad', 'unknown');
+var WSQ_ERROR = new PouchError(500, 'web_sql_went_bad', 'unknown');
+var LDB_ERROR = new PouchError(500, 'levelDB_went_went_bad', 'unknown');
+var FORBIDDEN = new PouchError(403, 'forbidden', 'Forbidden by design doc validate_doc_update function');
+var INVALID_REV = new PouchError(400, 'bad_request', 'Invalid rev format');
+var FILE_EXISTS = new PouchError(412, 'file_exists', 'The database could not be created, the file already exists.');
+var MISSING_STUB = new PouchError(412, 'missing_stub', 'A pre-existing attachment stub wasn\'t found');
+var INVALID_URL = new PouchError(413, 'invalid_url', 'Provided URL is invalid');
+
+function createError(error, reason) {
+  function CustomPouchError(reason) {
+    // inherit error properties from our parent error manually
+    // so as to allow proper JSON parsing.
+    /* jshint ignore:start */
+    var names = Object.getOwnPropertyNames(error);
+    for (var i = 0, len = names.length; i < len; i++) {
+      if (typeof error[names[i]] !== 'function') {
+        this[names[i]] = error[names[i]];
+      }
+    }
+    /* jshint ignore:end */
+    if (reason !== undefined) {
+      this.reason = reason;
+    }
+  }
+  CustomPouchError.prototype = PouchError.prototype;
+  return new CustomPouchError(reason);
+}
+
+function generateErrorFromResponse(err) {
+
+  if (typeof err !== 'object') {
+    var data = err;
+    err = UNKNOWN_ERROR;
+    err.data = data;
+  }
+
+  if ('error' in err && err.error === 'conflict') {
+    err.name = 'conflict';
+    err.status = 409;
+  }
+
+  if (!('name' in err)) {
+    err.name = err.error || 'unknown';
+  }
+
+  if (!('status' in err)) {
+    err.status = 500;
+  }
+
+  if (!('message' in err)) {
+    err.message = err.message || err.reason;
+  }
+
+  return err;
+}
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-fetch/lib/index-browser.es.js":
+/*!************************************************************!*\
+  !*** ./node_modules/pouchdb-fetch/lib/index-browser.es.js ***!
+  \************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "fetch": () => (/* binding */ f),
+/* harmony export */   "Headers": () => (/* binding */ h),
+/* harmony export */   "AbortController": () => (/* binding */ a)
+/* harmony export */ });
+// AbortController was introduced quite a while after fetch and
+// isnt required for PouchDB to function so polyfill if needed
+var a = (typeof AbortController !== 'undefined')
+    ? AbortController
+    : function () { return {abort: function () {}}; };
+
+var f = fetch;
+var h = Headers;
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-find/lib/index-browser.es.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/pouchdb-find/lib/index-browser.es.js ***!
+  \***********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var pouchdb_errors__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-errors */ "./node_modules/pouchdb-errors/lib/index.es.js");
+/* harmony import */ var pouchdb_fetch__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-fetch */ "./node_modules/pouchdb-fetch/lib/index-browser.es.js");
+/* harmony import */ var pouchdb_abstract_mapreduce__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! pouchdb-abstract-mapreduce */ "./node_modules/pouchdb-abstract-mapreduce/lib/index.es.js");
+/* harmony import */ var pouchdb_md5__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! pouchdb-md5 */ "./node_modules/pouchdb-md5/lib/index-browser.es.js");
+/* harmony import */ var pouchdb_collate__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! pouchdb-collate */ "./node_modules/pouchdb-collate/lib/index.es.js");
+/* harmony import */ var pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! pouchdb-selector-core */ "./node_modules/pouchdb-selector-core/lib/index.es.js");
+/* harmony import */ var pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! pouchdb-utils */ "./node_modules/pouchdb-utils/lib/index-browser.es.js");
+
+
+
+
+
+
+
+
+// we restucture the supplied JSON considerably, because the official
+// Mango API is very particular about a lot of this stuff, but we like
+// to be liberal with what we accept in order to prevent mental
+// breakdowns in our users
+function massageCreateIndexRequest(requestDef) {
+  requestDef = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(requestDef);
+
+  if (!requestDef.index) {
+    requestDef.index = {};
+  }
+
+  ['type', 'name', 'ddoc'].forEach(function (key) {
+    if (requestDef.index[key]) {
+      requestDef[key] = requestDef.index[key];
+      delete requestDef.index[key];
+    }
+  });
+
+  if (requestDef.fields) {
+    requestDef.index.fields = requestDef.fields;
+    delete requestDef.fields;
+  }
+
+  if (!requestDef.type) {
+    requestDef.type = 'json';
+  }
+  return requestDef;
+}
+
+function dbFetch(db, path, opts, callback) {
+  var status, ok;
+  opts.headers = new pouchdb_fetch__WEBPACK_IMPORTED_MODULE_1__.Headers({'Content-type': 'application/json'});
+  db.fetch(path, opts).then(function (response) {
+    status = response.status;
+    ok = response.ok;
+    return response.json();
+  }).then(function (json) {
+    if (!ok) {
+      json.status = status;
+      var err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_0__.generateErrorFromResponse)(json);
+      callback(err);
+    } else {
+      callback(null, json);
+    }
+  }).catch(callback);
+}
+
+function createIndex(db, requestDef, callback) {
+  requestDef = massageCreateIndexRequest(requestDef);
+  dbFetch(db, '_index', {
+    method: 'POST',
+    body: JSON.stringify(requestDef)
+  }, callback);
+}
+
+function find(db, requestDef, callback) {
+  dbFetch(db, '_find', {
+    method: 'POST',
+    body: JSON.stringify(requestDef)
+  }, callback);
+}
+
+function explain(db, requestDef, callback) {
+  dbFetch(db, '_explain', {
+    method: 'POST',
+    body: JSON.stringify(requestDef)
+  }, callback);
+}
+
+function getIndexes(db, callback) {
+  dbFetch(db, '_index', {
+    method: 'GET'
+  }, callback);
+}
+
+function deleteIndex(db, indexDef, callback) {
+
+
+  var ddoc = indexDef.ddoc;
+  var type = indexDef.type || 'json';
+  var name = indexDef.name;
+
+  if (!ddoc) {
+    return callback(new Error('you must provide an index\'s ddoc'));
+  }
+
+  if (!name) {
+    return callback(new Error('you must provide an index\'s name'));
+  }
+
+  var url = '_index/' + [ddoc, type, name].map(encodeURIComponent).join('/');
+
+  dbFetch(db, url, {method: 'DELETE'}, callback);
+}
+
+function getArguments(fun) {
+  return function () {
+    var len = arguments.length;
+    var args = new Array(len);
+    var i = -1;
+    while (++i < len) {
+      args[i] = arguments[i];
+    }
+    return fun.call(this, args);
+  };
+}
+
+function callbackify(fun) {
+  return getArguments(function (args) {
+    var cb = args.pop();
+    var promise = fun.apply(this, args);
+    promisedCallback(promise, cb);
+    return promise;
+  });
+}
+
+function promisedCallback(promise, callback) {
+  promise.then(function (res) {
+    (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.nextTick)(function () {
+      callback(null, res);
+    });
+  }, function (reason) {
+    (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.nextTick)(function () {
+      callback(reason);
+    });
+  });
+  return promise;
+}
+
+var flatten = getArguments(function (args) {
+  var res = [];
+  for (var i = 0, len = args.length; i < len; i++) {
+    var subArr = args[i];
+    if (Array.isArray(subArr)) {
+      res = res.concat(flatten.apply(null, subArr));
+    } else {
+      res.push(subArr);
+    }
+  }
+  return res;
+});
+
+function mergeObjects(arr) {
+  var res = {};
+  for (var i = 0, len = arr.length; i < len; i++) {
+    res = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.assign)(res, arr[i]);
+  }
+  return res;
+}
+
+// Selects a list of fields defined in dot notation from one doc
+// and copies them to a new doc. Like underscore _.pick but supports nesting.
+function pick(obj, arr) {
+  var res = {};
+  for (var i = 0, len = arr.length; i < len; i++) {
+    var parsedField = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.parseField)(arr[i]);
+    var value = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getFieldFromDoc)(obj, parsedField);
+    if (typeof value !== 'undefined') {
+      (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.setFieldInDoc)(res, parsedField, value);
+    }
+  }
+  return res;
+}
+
+// e.g. ['a'], ['a', 'b'] is true, but ['b'], ['a', 'b'] is false
+function oneArrayIsSubArrayOfOther(left, right) {
+
+  for (var i = 0, len = Math.min(left.length, right.length); i < len; i++) {
+    if (left[i] !== right[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// e.g.['a', 'b', 'c'], ['a', 'b'] is false
+function oneArrayIsStrictSubArrayOfOther(left, right) {
+
+  if (left.length > right.length) {
+    return false;
+  }
+
+  return oneArrayIsSubArrayOfOther(left, right);
+}
+
+// same as above, but treat the left array as an unordered set
+// e.g. ['b', 'a'], ['a', 'b', 'c'] is true, but ['c'], ['a', 'b', 'c'] is false
+function oneSetIsSubArrayOfOther(left, right) {
+  left = left.slice();
+  for (var i = 0, len = right.length; i < len; i++) {
+    var field = right[i];
+    if (!left.length) {
+      break;
+    }
+    var leftIdx = left.indexOf(field);
+    if (leftIdx === -1) {
+      return false;
+    } else {
+      left.splice(leftIdx, 1);
+    }
+  }
+  return true;
+}
+
+function arrayToObject(arr) {
+  var res = {};
+  for (var i = 0, len = arr.length; i < len; i++) {
+    res[arr[i]] = true;
+  }
+  return res;
+}
+
+function max(arr, fun) {
+  var max = null;
+  var maxScore = -1;
+  for (var i = 0, len = arr.length; i < len; i++) {
+    var element = arr[i];
+    var score = fun(element);
+    if (score > maxScore) {
+      maxScore = score;
+      max = element;
+    }
+  }
+  return max;
+}
+
+function arrayEquals(arr1, arr2) {
+  if (arr1.length !== arr2.length) {
+    return false;
+  }
+  for (var i = 0, len = arr1.length; i < len; i++) {
+    if (arr1[i] !== arr2[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function uniq(arr) {
+  var obj = {};
+  for (var i = 0; i < arr.length; i++) {
+    obj['$' + arr[i]] = true;
+  }
+  return Object.keys(obj).map(function (key) {
+    return key.substring(1);
+  });
+}
+
+//
+// One thing about these mappers:
+//
+// Per the advice of John-David Dalton (http://youtu.be/NthmeLEhDDM),
+// what you want to do in this case is optimize for the smallest possible
+// function, since that's the thing that gets run over and over again.
+//
+// This code would be a lot simpler if all the if/elses were inside
+// the function, but it would also be a lot less performant.
+//
+
+
+function createDeepMultiMapper(fields, emit) {
+  return function (doc) {
+    var toEmit = [];
+    for (var i = 0, iLen = fields.length; i < iLen; i++) {
+      var parsedField = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.parseField)(fields[i]);
+      var value = doc;
+      for (var j = 0, jLen = parsedField.length; j < jLen; j++) {
+        var key = parsedField[j];
+        value = value[key];
+        if (typeof value === 'undefined') {
+          return; // don't emit
+        }
+      }
+      toEmit.push(value);
+    }
+    emit(toEmit);
+  };
+}
+
+function createDeepSingleMapper(field, emit) {
+  var parsedField = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.parseField)(field);
+  return function (doc) {
+    var value = doc;
+    for (var i = 0, len = parsedField.length; i < len; i++) {
+      var key = parsedField[i];
+      value = value[key];
+      if (typeof value === 'undefined') {
+        return; // do nothing
+      }
+    }
+    emit(value);
+  };
+}
+
+function createShallowSingleMapper(field, emit) {
+  return function (doc) {
+    emit(doc[field]);
+  };
+}
+
+function createShallowMultiMapper(fields, emit) {
+  return function (doc) {
+    var toEmit = [];
+    for (var i = 0, len = fields.length; i < len; i++) {
+      toEmit.push(doc[fields[i]]);
+    }
+    emit(toEmit);
+  };
+}
+
+function checkShallow(fields) {
+  for (var i = 0, len = fields.length; i < len; i++) {
+    var field = fields[i];
+    if (field.indexOf('.') !== -1) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function createMapper(fields, emit) {
+  var isShallow = checkShallow(fields);
+  var isSingle = fields.length === 1;
+
+  // notice we try to optimize for the most common case,
+  // i.e. single shallow indexes
+  if (isShallow) {
+    if (isSingle) {
+      return createShallowSingleMapper(fields[0], emit);
+    } else { // multi
+      return createShallowMultiMapper(fields, emit);
+    }
+  } else { // deep
+    if (isSingle) {
+      return createDeepSingleMapper(fields[0], emit);
+    } else { // multi
+      return createDeepMultiMapper(fields, emit);
+    }
+  }
+}
+
+function mapper(mapFunDef, emit) {
+  // mapFunDef is a list of fields
+
+  var fields = Object.keys(mapFunDef.fields);
+
+  return createMapper(fields, emit);
+}
+
+/* istanbul ignore next */
+function reducer(/*reduceFunDef*/) {
+  throw new Error('reduce not supported');
+}
+
+function ddocValidator(ddoc, viewName) {
+  var view = ddoc.views[viewName];
+  // This doesn't actually need to be here apparently, but
+  // I feel safer keeping it.
+  /* istanbul ignore if */
+  if (!view.map || !view.map.fields) {
+    throw new Error('ddoc ' + ddoc._id +' with view ' + viewName +
+      ' doesn\'t have map.fields defined. ' +
+      'maybe it wasn\'t created by this plugin?');
+  }
+}
+
+var abstractMapper = (0,pouchdb_abstract_mapreduce__WEBPACK_IMPORTED_MODULE_2__["default"])(
+  /* localDocName */ 'indexes',
+  mapper,
+  reducer,
+  ddocValidator
+);
+
+function abstractMapper$1 (db) {
+  return db._customFindAbstractMapper || abstractMapper;
+}
+
+// normalize the "sort" value
+function massageSort(sort) {
+  if (!Array.isArray(sort)) {
+    throw new Error('invalid sort json - should be an array');
+  }
+  return sort.map(function (sorting) {
+    if (typeof sorting === 'string') {
+      var obj = {};
+      obj[sorting] = 'asc';
+      return obj;
+    } else {
+      return sorting;
+    }
+  });
+}
+
+function massageUseIndex(useIndex) {
+  var cleanedUseIndex = [];
+  if (typeof useIndex === 'string') {
+    cleanedUseIndex.push(useIndex);
+  } else {
+    cleanedUseIndex = useIndex;
+  }
+
+  return cleanedUseIndex.map(function (name) {
+    return name.replace('_design/', '');
+  });
+}
+
+function massageIndexDef(indexDef) {
+  indexDef.fields = indexDef.fields.map(function (field) {
+    if (typeof field === 'string') {
+      var obj = {};
+      obj[field] = 'asc';
+      return obj;
+    }
+    return field;
+  });
+  return indexDef;
+}
+
+function getKeyFromDoc(doc, index) {
+  var res = [];
+  for (var i = 0; i < index.def.fields.length; i++) {
+    var field = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(index.def.fields[i]);
+    res.push(doc[field]);
+  }
+  return res;
+}
+
+// have to do this manually because REASONS. I don't know why
+// CouchDB didn't implement inclusive_start
+function filterInclusiveStart(rows, targetValue, index) {
+  var indexFields = index.def.fields;
+  for (var i = 0, len = rows.length; i < len; i++) {
+    var row = rows[i];
+
+    // shave off any docs at the beginning that are <= the
+    // target value
+
+    var docKey = getKeyFromDoc(row.doc, index);
+    if (indexFields.length === 1) {
+      docKey = docKey[0]; // only one field, not multi-field
+    } else { // more than one field in index
+      // in the case where e.g. the user is searching {$gt: {a: 1}}
+      // but the index is [a, b], then we need to shorten the doc key
+      while (docKey.length > targetValue.length) {
+        docKey.pop();
+      }
+    }
+    //ABS as we just looking for values that don't match
+    if (Math.abs((0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_4__.collate)(docKey, targetValue)) > 0) {
+      // no need to filter any further; we're past the key
+      break;
+    }
+  }
+  return i > 0 ? rows.slice(i) : rows;
+}
+
+function reverseOptions(opts) {
+  var newOpts = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(opts);
+  delete newOpts.startkey;
+  delete newOpts.endkey;
+  delete newOpts.inclusive_start;
+  delete newOpts.inclusive_end;
+
+  if ('endkey' in opts) {
+    newOpts.startkey = opts.endkey;
+  }
+  if ('startkey' in opts) {
+    newOpts.endkey = opts.startkey;
+  }
+  if ('inclusive_start' in opts) {
+    newOpts.inclusive_end = opts.inclusive_start;
+  }
+  if ('inclusive_end' in opts) {
+    newOpts.inclusive_start = opts.inclusive_end;
+  }
+  return newOpts;
+}
+
+function validateIndex(index) {
+  var ascFields = index.fields.filter(function (field) {
+    return (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getValue)(field) === 'asc';
+  });
+  if (ascFields.length !== 0 && ascFields.length !== index.fields.length) {
+    throw new Error('unsupported mixed sorting');
+  }
+}
+
+function validateSort(requestDef, index) {
+  if (index.defaultUsed && requestDef.sort) {
+    var noneIdSorts = requestDef.sort.filter(function (sortItem) {
+      return Object.keys(sortItem)[0] !== '_id';
+    }).map(function (sortItem) {
+      return Object.keys(sortItem)[0];
+    });
+
+    if (noneIdSorts.length > 0) {
+      throw new Error('Cannot sort on field(s) "' + noneIdSorts.join(',') +
+      '" when using the default index');
+    }
+  }
+
+  if (index.defaultUsed) {
+    return;
+  }
+}
+
+function validateFindRequest(requestDef) {
+  if (typeof requestDef.selector !== 'object') {
+    throw new Error('you must provide a selector when you find()');
+  }
+
+  /*var selectors = requestDef.selector['$and'] || [requestDef.selector];
+  for (var i = 0; i < selectors.length; i++) {
+    var selector = selectors[i];
+    var keys = Object.keys(selector);
+    if (keys.length === 0) {
+      throw new Error('invalid empty selector');
+    }
+    //var selection = selector[keys[0]];
+    /*if (Object.keys(selection).length !== 1) {
+      throw new Error('invalid selector: ' + JSON.stringify(selection) +
+        ' - it must have exactly one key/value');
+    }
+  }*/
+}
+
+// determine the maximum number of fields
+// we're going to need to query, e.g. if the user
+// has selection ['a'] and sorting ['a', 'b'], then we
+// need to use the longer of the two: ['a', 'b']
+function getUserFields(selector, sort) {
+  var selectorFields = Object.keys(selector);
+  var sortFields = sort? sort.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey) : [];
+  var userFields;
+  if (selectorFields.length >= sortFields.length) {
+    userFields = selectorFields;
+  } else {
+    userFields = sortFields;
+  }
+
+  if (sortFields.length === 0) {
+    return {
+      fields: userFields
+    };
+  }
+
+  // sort according to the user's preferred sorting
+  userFields = userFields.sort(function (left, right) {
+    var leftIdx = sortFields.indexOf(left);
+    if (leftIdx === -1) {
+      leftIdx = Number.MAX_VALUE;
+    }
+    var rightIdx = sortFields.indexOf(right);
+    if (rightIdx === -1) {
+      rightIdx = Number.MAX_VALUE;
+    }
+    return leftIdx < rightIdx ? -1 : leftIdx > rightIdx ? 1 : 0;
+  });
+
+  return {
+    fields: userFields,
+    sortOrder: sort.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)
+  };
+}
+
+function createIndex$1(db, requestDef) {
+  requestDef = massageCreateIndexRequest(requestDef);
+  var originalIndexDef = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(requestDef.index);
+  requestDef.index = massageIndexDef(requestDef.index);
+
+  validateIndex(requestDef.index);
+
+  // calculating md5 is expensive - memoize and only
+  // run if required
+  var md5;
+  function getMd5() {
+    return md5 || (md5 = (0,pouchdb_md5__WEBPACK_IMPORTED_MODULE_3__.stringMd5)(JSON.stringify(requestDef)));
+  }
+
+  var viewName = requestDef.name || ('idx-' + getMd5());
+
+  var ddocName = requestDef.ddoc || ('idx-' + getMd5());
+  var ddocId = '_design/' + ddocName;
+
+  var hasInvalidLanguage = false;
+  var viewExists = false;
+
+  function updateDdoc(doc) {
+    if (doc._rev && doc.language !== 'query') {
+      hasInvalidLanguage = true;
+    }
+    doc.language = 'query';
+    doc.views = doc.views || {};
+
+    viewExists = !!doc.views[viewName];
+
+    if (viewExists) {
+      return false;
+    }
+
+    doc.views[viewName] = {
+      map: {
+        fields: mergeObjects(requestDef.index.fields)
+      },
+      reduce: '_count',
+      options: {
+        def: originalIndexDef
+      }
+    };
+
+    return doc;
+  }
+
+  db.constructor.emit('debug', ['find', 'creating index', ddocId]);
+
+  return (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.upsert)(db, ddocId, updateDdoc).then(function () {
+    if (hasInvalidLanguage) {
+      throw new Error('invalid language for ddoc with id "' +
+      ddocId +
+      '" (should be "query")');
+    }
+  }).then(function () {
+    // kick off a build
+    // TODO: abstract-pouchdb-mapreduce should support auto-updating
+    // TODO: should also use update_after, but pouchdb/pouchdb#3415 blocks me
+    var signature = ddocName + '/' + viewName;
+    return abstractMapper$1(db).query.call(db, signature, {
+      limit: 0,
+      reduce: false
+    }).then(function () {
+      return {
+        id: ddocId,
+        name: viewName,
+        result: viewExists ? 'exists' : 'created'
+      };
+    });
+  });
+}
+
+function getIndexes$1(db) {
+  // just search through all the design docs and filter in-memory.
+  // hopefully there aren't that many ddocs.
+  return db.allDocs({
+    startkey: '_design/',
+    endkey: '_design/\uffff',
+    include_docs: true
+  }).then(function (allDocsRes) {
+    var res = {
+      indexes: [{
+        ddoc: null,
+        name: '_all_docs',
+        type: 'special',
+        def: {
+          fields: [{_id: 'asc'}]
+        }
+      }]
+    };
+
+    res.indexes = flatten(res.indexes, allDocsRes.rows.filter(function (row) {
+      return row.doc.language === 'query';
+    }).map(function (row) {
+      var viewNames = row.doc.views !== undefined ? Object.keys(row.doc.views) : [];
+
+      return viewNames.map(function (viewName) {
+        var view = row.doc.views[viewName];
+        return {
+          ddoc: row.id,
+          name: viewName,
+          type: 'json',
+          def: massageIndexDef(view.options.def)
+        };
+      });
+    }));
+
+    // these are sorted by view name for some reason
+    res.indexes.sort(function (left, right) {
+      return (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.compare)(left.name, right.name);
+    });
+    res.total_rows = res.indexes.length;
+    return res;
+  });
+}
+
+// couchdb lowest collation value
+var COLLATE_LO = null;
+
+// couchdb highest collation value (TODO: well not really, but close enough amirite)
+var COLLATE_HI = {"\uffff": {}};
+
+const SHORT_CIRCUIT_QUERY = {
+  queryOpts: { limit: 0, startkey: COLLATE_HI, endkey: COLLATE_LO },
+  inMemoryFields: [],
+};
+
+// couchdb second-lowest collation value
+
+function checkFieldInIndex(index, field) {
+  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
+  for (var i = 0, len = indexFields.length; i < len; i++) {
+    var indexField = indexFields[i];
+    if (field === indexField) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// so when you do e.g. $eq/$eq, we can do it entirely in the database.
+// but when you do e.g. $gt/$eq, the first part can be done
+// in the database, but the second part has to be done in-memory,
+// because $gt has forced us to lose precision.
+// so that's what this determines
+function userOperatorLosesPrecision(selector, field) {
+  var matcher = selector[field];
+  var userOperator = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(matcher);
+
+  return userOperator !== '$eq';
+}
+
+// sort the user fields by their position in the index,
+// if they're in the index
+function sortFieldsByIndex(userFields, index) {
+  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
+
+  return userFields.slice().sort(function (a, b) {
+    var aIdx = indexFields.indexOf(a);
+    var bIdx = indexFields.indexOf(b);
+    if (aIdx === -1) {
+      aIdx = Number.MAX_VALUE;
+    }
+    if (bIdx === -1) {
+      bIdx = Number.MAX_VALUE;
+    }
+    return (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.compare)(aIdx, bIdx);
+  });
+}
+
+// first pass to try to find fields that will need to be sorted in-memory
+function getBasicInMemoryFields(index, selector, userFields) {
+
+  userFields = sortFieldsByIndex(userFields, index);
+
+  // check if any of the user selectors lose precision
+  var needToFilterInMemory = false;
+  for (var i = 0, len = userFields.length; i < len; i++) {
+    var field = userFields[i];
+    if (needToFilterInMemory || !checkFieldInIndex(index, field)) {
+      return userFields.slice(i);
+    }
+    if (i < len - 1 && userOperatorLosesPrecision(selector, field)) {
+      needToFilterInMemory = true;
+    }
+  }
+  return [];
+}
+
+function getInMemoryFieldsFromNe(selector) {
+  var fields = [];
+  Object.keys(selector).forEach(function (field) {
+    var matcher = selector[field];
+    Object.keys(matcher).forEach(function (operator) {
+      if (operator === '$ne') {
+        fields.push(field);
+      }
+    });
+  });
+  return fields;
+}
+
+function getInMemoryFields(coreInMemoryFields, index, selector, userFields) {
+  var result = flatten(
+    // in-memory fields reported as necessary by the query planner
+    coreInMemoryFields,
+    // combine with another pass that checks for any we may have missed
+    getBasicInMemoryFields(index, selector, userFields),
+    // combine with another pass that checks for $ne's
+    getInMemoryFieldsFromNe(selector)
+  );
+
+  return sortFieldsByIndex(uniq(result), index);
+}
+
+// check that at least one field in the user's query is represented
+// in the index. order matters in the case of sorts
+function checkIndexFieldsMatch(indexFields, sortOrder, fields) {
+  if (sortOrder) {
+    // array has to be a strict subarray of index array. furthermore,
+    // the sortOrder fields need to all be represented in the index
+    var sortMatches = oneArrayIsStrictSubArrayOfOther(sortOrder, indexFields);
+    var selectorMatches = oneArrayIsSubArrayOfOther(fields, indexFields);
+
+    return sortMatches && selectorMatches;
+  }
+
+  // all of the user's specified fields still need to be
+  // on the left side of the index array, although the order
+  // doesn't matter
+  return oneSetIsSubArrayOfOther(fields, indexFields);
+}
+
+var logicalMatchers = ['$eq', '$gt', '$gte', '$lt', '$lte'];
+function isNonLogicalMatcher(matcher) {
+  return logicalMatchers.indexOf(matcher) === -1;
+}
+
+// check all the index fields for usages of '$ne'
+// e.g. if the user queries {foo: {$ne: 'foo'}, bar: {$eq: 'bar'}},
+// then we can neither use an index on ['foo'] nor an index on
+// ['foo', 'bar'], but we can use an index on ['bar'] or ['bar', 'foo']
+function checkFieldsLogicallySound(indexFields, selector) {
+  var firstField = indexFields[0];
+  var matcher = selector[firstField];
+
+  if (typeof matcher === 'undefined') {
+    /* istanbul ignore next */
+    return true;
+  }
+
+  var isInvalidNe = Object.keys(matcher).length === 1 &&
+    (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(matcher) === '$ne';
+
+  return !isInvalidNe;
+}
+
+function checkIndexMatches(index, sortOrder, fields, selector) {
+
+  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
+
+  var fieldsMatch = checkIndexFieldsMatch(indexFields, sortOrder, fields);
+
+  if (!fieldsMatch) {
+    return false;
+  }
+
+  return checkFieldsLogicallySound(indexFields, selector);
+}
+
+//
+// the algorithm is very simple:
+// take all the fields the user supplies, and if those fields
+// are a strict subset of the fields in some index,
+// then use that index
+//
+//
+function findMatchingIndexes(selector, userFields, sortOrder, indexes) {
+  return indexes.filter(function (index) {
+    return checkIndexMatches(index, sortOrder, userFields, selector);
+  });
+}
+
+// find the best index, i.e. the one that matches the most fields
+// in the user's query
+function findBestMatchingIndex(selector, userFields, sortOrder, indexes, useIndex) {
+
+  var matchingIndexes = findMatchingIndexes(selector, userFields, sortOrder, indexes);
+
+  if (matchingIndexes.length === 0) {
+    if (useIndex) {
+      throw {
+        error: "no_usable_index",
+        message: "There is no index available for this selector."
+      };
+    }
+    //return `all_docs` as a default index;
+    //I'm assuming that _all_docs is always first
+    var defaultIndex = indexes[0];
+    defaultIndex.defaultUsed = true;
+    return defaultIndex;
+  }
+  if (matchingIndexes.length === 1 && !useIndex) {
+    return matchingIndexes[0];
+  }
+
+  var userFieldsMap = arrayToObject(userFields);
+
+  function scoreIndex(index) {
+    var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
+    var score = 0;
+    for (var i = 0, len = indexFields.length; i < len; i++) {
+      var indexField = indexFields[i];
+      if (userFieldsMap[indexField]) {
+        score++;
+      }
+    }
+    return score;
+  }
+
+  if (useIndex) {
+    var useIndexDdoc = '_design/' + useIndex[0];
+    var useIndexName = useIndex.length === 2 ? useIndex[1] : false;
+    var index = matchingIndexes.find(function (index) {
+      if (useIndexName && index.ddoc === useIndexDdoc && useIndexName === index.name) {
+        return true;
+      }
+
+      if (index.ddoc === useIndexDdoc) {
+        /* istanbul ignore next */
+        return true;
+      }
+
+      return false;
+    });
+
+    if (!index) {
+      throw {
+        error: "unknown_error",
+        message: "Could not find that index or could not use that index for the query"
+      };
+    }
+    return index;
+  }
+
+  return max(matchingIndexes, scoreIndex);
+}
+
+function getSingleFieldQueryOptsFor(userOperator, userValue) {
+  switch (userOperator) {
+    case '$eq':
+      return {key: userValue};
+    case '$lte':
+      return {endkey: userValue};
+    case '$gte':
+      return {startkey: userValue};
+    case '$lt':
+      return {
+        endkey: userValue,
+        inclusive_end: false
+      };
+    case '$gt':
+      return {
+        startkey: userValue,
+        inclusive_start: false
+      };
+  }
+
+  return {
+    startkey: COLLATE_LO
+  };
+}
+
+function getSingleFieldCoreQueryPlan(selector, index) {
+  var field = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey)(index.def.fields[0]);
+  //ignoring this because the test to exercise the branch is skipped at the moment
+  /* istanbul ignore next */
+  var matcher = selector[field] || {};
+  var inMemoryFields = [];
+
+  var userOperators = Object.keys(matcher);
+
+  var combinedOpts;
+
+  userOperators.forEach(function (userOperator) {
+
+    if (isNonLogicalMatcher(userOperator)) {
+      inMemoryFields.push(field);
+    }
+
+    var userValue = matcher[userOperator];
+
+    var newQueryOpts = getSingleFieldQueryOptsFor(userOperator, userValue);
+
+    if (combinedOpts) {
+      combinedOpts = mergeObjects([combinedOpts, newQueryOpts]);
+    } else {
+      combinedOpts = newQueryOpts;
+    }
+  });
+
+  return {
+    queryOpts: combinedOpts,
+    inMemoryFields: inMemoryFields
+  };
+}
+
+function getMultiFieldCoreQueryPlan(userOperator, userValue) {
+  switch (userOperator) {
+    case '$eq':
+      return {
+        startkey: userValue,
+        endkey: userValue
+      };
+    case '$lte':
+      return {
+        endkey: userValue
+      };
+    case '$gte':
+      return {
+        startkey: userValue
+      };
+    case '$lt':
+      return {
+        endkey: userValue,
+        inclusive_end: false
+      };
+    case '$gt':
+      return {
+        startkey: userValue,
+        inclusive_start: false
+      };
+  }
+}
+
+function getMultiFieldQueryOpts(selector, index) {
+
+  var indexFields = index.def.fields.map(pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getKey);
+
+  var inMemoryFields = [];
+  var startkey = [];
+  var endkey = [];
+  var inclusiveStart;
+  var inclusiveEnd;
+
+
+  function finish(i) {
+
+    if (inclusiveStart !== false) {
+      startkey.push(COLLATE_LO);
+    }
+    if (inclusiveEnd !== false) {
+      endkey.push(COLLATE_HI);
+    }
+    // keep track of the fields where we lost specificity,
+    // and therefore need to filter in-memory
+    inMemoryFields = indexFields.slice(i);
+  }
+
+  for (var i = 0, len = indexFields.length; i < len; i++) {
+    var indexField = indexFields[i];
+
+    var matcher = selector[indexField];
+
+    if (!matcher || !Object.keys(matcher).length) { // fewer fields in user query than in index
+      finish(i);
+      break;
+    } else if (Object.keys(matcher).some(isNonLogicalMatcher)) { // non-logical are ignored
+      finish(i);
+      break;
+    } else if (i > 0) {
+      var usingGtlt = (
+        '$gt' in matcher || '$gte' in matcher ||
+        '$lt' in matcher || '$lte' in matcher);
+      var previousKeys = Object.keys(selector[indexFields[i - 1]]);
+      var previousWasEq = arrayEquals(previousKeys, ['$eq']);
+      var previousWasSame = arrayEquals(previousKeys, Object.keys(matcher));
+      var gtltLostSpecificity = usingGtlt && !previousWasEq && !previousWasSame;
+      if (gtltLostSpecificity) {
+        finish(i);
+        break;
+      }
+    }
+
+    var userOperators = Object.keys(matcher);
+
+    var combinedOpts = null;
+
+    for (var j = 0; j < userOperators.length; j++) {
+      var userOperator = userOperators[j];
+      var userValue = matcher[userOperator];
+
+      var newOpts = getMultiFieldCoreQueryPlan(userOperator, userValue);
+
+      if (combinedOpts) {
+        combinedOpts = mergeObjects([combinedOpts, newOpts]);
+      } else {
+        combinedOpts = newOpts;
+      }
+    }
+
+    startkey.push('startkey' in combinedOpts ? combinedOpts.startkey : COLLATE_LO);
+    endkey.push('endkey' in combinedOpts ? combinedOpts.endkey : COLLATE_HI);
+    if ('inclusive_start' in combinedOpts) {
+      inclusiveStart = combinedOpts.inclusive_start;
+    }
+    if ('inclusive_end' in combinedOpts) {
+      inclusiveEnd = combinedOpts.inclusive_end;
+    }
+  }
+
+  var res = {
+    startkey: startkey,
+    endkey: endkey
+  };
+
+  if (typeof inclusiveStart !== 'undefined') {
+    res.inclusive_start = inclusiveStart;
+  }
+  if (typeof inclusiveEnd !== 'undefined') {
+    res.inclusive_end = inclusiveEnd;
+  }
+
+  return {
+    queryOpts: res,
+    inMemoryFields: inMemoryFields
+  };
+}
+
+function shouldShortCircuit(selector) {
+  // We have a field to select from, but not a valid value
+  // this should result in a short circuited query 
+  // just like the http adapter (couchdb) and mongodb
+  // see tests for issue #7810
+  
+  // @todo Use 'Object.values' when Node.js v6 support is dropped.
+  const values = Object.keys(selector).map(function (key) {
+    return selector[key];
+  });
+  return values.some(function (val) { 
+    return typeof val === 'object' && Object.keys(val).length === 0;
+});
+}
+
+function getDefaultQueryPlan(selector) {
+  //using default index, so all fields need to be done in memory
+  return {
+    queryOpts: {startkey: null},
+    inMemoryFields: [Object.keys(selector)]
+  };
+}
+
+function getCoreQueryPlan(selector, index) {
+  if (index.defaultUsed) {
+    return getDefaultQueryPlan(selector, index);
+  }
+
+  if (index.def.fields.length === 1) {
+    // one field in index, so the value was indexed as a singleton
+    return getSingleFieldCoreQueryPlan(selector, index);
+  }
+  // else index has multiple fields, so the value was indexed as an array
+  return getMultiFieldQueryOpts(selector, index);
+}
+
+function planQuery(request, indexes) {
+
+  var selector = request.selector;
+  var sort = request.sort;
+
+  if (shouldShortCircuit(selector)) {
+    return (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.assign)({}, SHORT_CIRCUIT_QUERY, { index: indexes[0] });
+  }
+
+  var userFieldsRes = getUserFields(selector, sort);
+
+  var userFields = userFieldsRes.fields;
+  var sortOrder = userFieldsRes.sortOrder;
+  var index = findBestMatchingIndex(selector, userFields, sortOrder, indexes, request.use_index);
+
+  var coreQueryPlan = getCoreQueryPlan(selector, index);
+  var queryOpts = coreQueryPlan.queryOpts;
+  var coreInMemoryFields = coreQueryPlan.inMemoryFields;
+
+  var inMemoryFields = getInMemoryFields(coreInMemoryFields, index, selector, userFields);
+
+  var res = {
+    queryOpts: queryOpts,
+    index: index,
+    inMemoryFields: inMemoryFields
+  };
+  return res;
+}
+
+function indexToSignature(index) {
+  // remove '_design/'
+  return index.ddoc.substring(8) + '/' + index.name;
+}
+
+function doAllDocs(db, originalOpts) {
+  var opts = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.clone)(originalOpts);
+
+  // CouchDB responds in weird ways when you provide a non-string to _id;
+  // we mimic the behavior for consistency. See issue66 tests for details.
+  if (opts.descending) {
+    if ('endkey' in opts && typeof opts.endkey !== 'string') {
+      opts.endkey = '';
+    }
+    if ('startkey' in opts && typeof opts.startkey !== 'string') {
+      opts.limit = 0;
+    }
+  } else {
+    if ('startkey' in opts && typeof opts.startkey !== 'string') {
+      opts.startkey = '';
+    }
+    if ('endkey' in opts && typeof opts.endkey !== 'string') {
+      opts.limit = 0;
+    }
+  }
+  if ('key' in opts && typeof opts.key !== 'string') {
+    opts.limit = 0;
+  }
+
+  if (opts.limit > 0 && opts.indexes_count) {
+    // brute force and quite naive impl.
+    // amp up the limit with the amount of (indexes) design docs
+    // or is this too naive? How about skip?
+    opts.original_limit = opts.limit;
+    opts.limit += opts.indexes_count;
+  }
+
+  return db.allDocs(opts)
+    .then(function (res) {
+      // filter out any design docs that _all_docs might return
+      res.rows = res.rows.filter(function (row) {
+        return !/^_design\//.test(row.id);
+      });
+      // put back original limit
+      if (opts.original_limit) {
+        opts.limit = opts.original_limit;
+      }
+      // enforce the rows to respect the given limit
+      res.rows = res.rows.slice(0, opts.limit);
+      return res;
+    });
+}
+
+function find$1(db, requestDef, explain) {
+  if (requestDef.selector) {
+    requestDef.selector = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.massageSelector)(requestDef.selector);
+  }
+
+  if (requestDef.sort) {
+    requestDef.sort = massageSort(requestDef.sort);
+  }
+
+  if (requestDef.use_index) {
+    requestDef.use_index = massageUseIndex(requestDef.use_index);
+  }
+
+  validateFindRequest(requestDef);
+
+  return getIndexes$1(db).then(function (getIndexesRes) {
+
+    db.constructor.emit('debug', ['find', 'planning query', requestDef]);
+    var queryPlan = planQuery(requestDef, getIndexesRes.indexes);
+    db.constructor.emit('debug', ['find', 'query plan', queryPlan]);
+    
+    var indexToUse = queryPlan.index;
+    
+    validateSort(requestDef, indexToUse);
+
+    var opts = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.assign)({
+      include_docs: true,
+      reduce: false,
+      // Add amount of index for doAllDocs to use (related to issue #7810)
+      indexes_count: getIndexesRes.total_rows, 
+    }, queryPlan.queryOpts);
+
+    if ('startkey' in opts && 'endkey' in opts &&
+        (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_4__.collate)(opts.startkey, opts.endkey) > 0) {
+      // can't possibly return any results, startkey > endkey
+      /* istanbul ignore next */
+      return {docs: []};
+    }
+
+    var isDescending = requestDef.sort &&
+      typeof requestDef.sort[0] !== 'string' &&
+      (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.getValue)(requestDef.sort[0]) === 'desc';
+
+    if (isDescending) {
+      // either all descending or all ascending
+      opts.descending = true;
+      opts = reverseOptions(opts);
+    }
+
+    if (!queryPlan.inMemoryFields.length) {
+      // no in-memory filtering necessary, so we can let the
+      // database do the limit/skip for us
+      if ('limit' in requestDef) {
+        opts.limit = requestDef.limit;
+      }
+      if ('skip' in requestDef) {
+        opts.skip = requestDef.skip;
+      }
+    }
+
+    if (explain) {
+      return Promise.resolve(queryPlan, opts);
+    }
+
+    return Promise.resolve().then(function () {
+      if (indexToUse.name === '_all_docs') {
+        return doAllDocs(db, opts);
+      } else {
+        var signature = indexToSignature(indexToUse);
+        return abstractMapper$1(db).query.call(db, signature, opts);
+      }
+    }).then(function (res) {
+      if (opts.inclusive_start === false) {
+        // may have to manually filter the first one,
+        // since couchdb has no true inclusive_start option
+        res.rows = filterInclusiveStart(res.rows, opts.startkey, indexToUse);
+      }
+
+      if (queryPlan.inMemoryFields.length) {
+        // need to filter some stuff in-memory
+        res.rows = (0,pouchdb_selector_core__WEBPACK_IMPORTED_MODULE_5__.filterInMemoryFields)(res.rows, requestDef, queryPlan.inMemoryFields);
+      }
+
+      var resp = {
+        docs: res.rows.map(function (row) {
+          var doc = row.doc;
+          if (requestDef.fields) {
+            return pick(doc, requestDef.fields);
+          }
+          return doc;
+        })
+      };
+
+      if (indexToUse.defaultUsed) {
+        resp.warning = 'No matching index found, create an index to optimize query time.';
+      }
+
+      return resp;
+    });
+  });
+}
+
+function explain$1(db, requestDef) {
+  return find$1(db, requestDef, true)
+  .then(function (queryPlan) {
+    return {
+      dbname: db.name,
+      index: queryPlan.index,
+      selector: requestDef.selector,
+      range: {
+        start_key: queryPlan.queryOpts.startkey,
+        end_key: queryPlan.queryOpts.endkey,
+      },
+      opts: {
+        use_index: requestDef.use_index || [],
+        bookmark: "nil", //hardcoded to match CouchDB since its not supported,
+        limit: requestDef.limit,
+        skip: requestDef.skip,
+        sort: requestDef.sort || {},
+        fields: requestDef.fields,
+        conflicts: false, //hardcoded to match CouchDB since its not supported,
+        r: [49], // hardcoded to match CouchDB since its not support
+      },
+      limit: requestDef.limit,
+      skip: requestDef.skip || 0,
+      fields: requestDef.fields,
+    };
+  });
+}
+
+function deleteIndex$1(db, index) {
+
+  if (!index.ddoc) {
+    throw new Error('you must supply an index.ddoc when deleting');
+  }
+
+  if (!index.name) {
+    throw new Error('you must supply an index.name when deleting');
+  }
+
+  var docId = index.ddoc;
+  var viewName = index.name;
+
+  function deltaFun(doc) {
+    if (Object.keys(doc.views).length === 1 && doc.views[viewName]) {
+      // only one view in this ddoc, delete the whole ddoc
+      return {_id: docId, _deleted: true};
+    }
+    // more than one view here, just remove the view
+    delete doc.views[viewName];
+    return doc;
+  }
+
+  return (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.upsert)(db, docId, deltaFun).then(function () {
+    return abstractMapper$1(db).viewCleanup.apply(db);
+  }).then(function () {
+    return {ok: true};
+  });
+}
+
+var createIndexAsCallback = callbackify(createIndex$1);
+var findAsCallback = callbackify(find$1);
+var explainAsCallback = callbackify(explain$1);
+var getIndexesAsCallback = callbackify(getIndexes$1);
+var deleteIndexAsCallback = callbackify(deleteIndex$1);
+
+var plugin = {};
+plugin.createIndex = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (requestDef, callback) {
+
+  if (typeof requestDef !== 'object') {
+    return callback(new Error('you must provide an index to create'));
+  }
+
+  var createIndex$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ?
+    createIndex : createIndexAsCallback;
+  createIndex$$1(this, requestDef, callback);
+});
+
+plugin.find = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (requestDef, callback) {
+
+  if (typeof callback === 'undefined') {
+    callback = requestDef;
+    requestDef = undefined;
+  }
+
+  if (typeof requestDef !== 'object') {
+    return callback(new Error('you must provide search parameters to find()'));
+  }
+
+  var find$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ? find : findAsCallback;
+  find$$1(this, requestDef, callback);
+});
+
+plugin.explain = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (requestDef, callback) {
+
+  if (typeof callback === 'undefined') {
+    callback = requestDef;
+    requestDef = undefined;
+  }
+
+  if (typeof requestDef !== 'object') {
+    return callback(new Error('you must provide search parameters to explain()'));
+  }
+
+  var find$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ? explain : explainAsCallback;
+  find$$1(this, requestDef, callback);
+});
+
+plugin.getIndexes = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (callback) {
+
+  var getIndexes$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ? getIndexes : getIndexesAsCallback;
+  getIndexes$$1(this, callback);
+});
+
+plugin.deleteIndex = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.toPromise)(function (indexDef, callback) {
+
+  if (typeof indexDef !== 'object') {
+    return callback(new Error('you must provide an index to delete'));
+  }
+
+  var deleteIndex$$1 = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_6__.isRemote)(this) ?
+    deleteIndex : deleteIndexAsCallback;
+  deleteIndex$$1(this, indexDef, callback);
+});
+
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (plugin);
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-mapreduce-utils/lib/index.es.js":
+/*!**************************************************************!*\
+  !*** ./node_modules/pouchdb-mapreduce-utils/lib/index.es.js ***!
+  \**************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "uniq": () => (/* binding */ uniq),
+/* harmony export */   "sequentialize": () => (/* binding */ sequentialize),
+/* harmony export */   "fin": () => (/* binding */ fin),
+/* harmony export */   "callbackify": () => (/* binding */ callbackify),
+/* harmony export */   "promisedCallback": () => (/* binding */ promisedCallback),
+/* harmony export */   "mapToKeysArray": () => (/* binding */ mapToKeysArray),
+/* harmony export */   "QueryParseError": () => (/* binding */ QueryParseError),
+/* harmony export */   "NotFoundError": () => (/* binding */ NotFoundError),
+/* harmony export */   "BuiltInError": () => (/* binding */ BuiltInError)
+/* harmony export */ });
+/* harmony import */ var pouchdb_collections__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-collections */ "./node_modules/pouchdb-collections/lib/index.es.js");
+/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! argsarray */ "./node_modules/argsarray/index.js");
+/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(argsarray__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var pouchdb_utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! pouchdb-utils */ "./node_modules/pouchdb-utils/lib/index-browser.es.js");
+/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! inherits */ "./node_modules/inherits/inherits_browser.js");
+/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(inherits__WEBPACK_IMPORTED_MODULE_3__);
+
+
+
+
+
+function QueryParseError(message) {
+  this.status = 400;
+  this.name = 'query_parse_error';
+  this.message = message;
+  this.error = true;
+  try {
+    Error.captureStackTrace(this, QueryParseError);
+  } catch (e) {}
+}
+
+inherits__WEBPACK_IMPORTED_MODULE_3___default()(QueryParseError, Error);
+
+function NotFoundError(message) {
+  this.status = 404;
+  this.name = 'not_found';
+  this.message = message;
+  this.error = true;
+  try {
+    Error.captureStackTrace(this, NotFoundError);
+  } catch (e) {}
+}
+
+inherits__WEBPACK_IMPORTED_MODULE_3___default()(NotFoundError, Error);
+
+function BuiltInError(message) {
+  this.status = 500;
+  this.name = 'invalid_value';
+  this.message = message;
+  this.error = true;
+  try {
+    Error.captureStackTrace(this, BuiltInError);
+  } catch (e) {}
+}
+
+inherits__WEBPACK_IMPORTED_MODULE_3___default()(BuiltInError, Error);
+
+function promisedCallback(promise, callback) {
+  if (callback) {
+    promise.then(function (res) {
+      (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_2__.nextTick)(function () {
+        callback(null, res);
+      });
+    }, function (reason) {
+      (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_2__.nextTick)(function () {
+        callback(reason);
+      });
+    });
+  }
+  return promise;
+}
+
+function callbackify(fun) {
+  return argsarray__WEBPACK_IMPORTED_MODULE_1___default()(function (args) {
+    var cb = args.pop();
+    var promise = fun.apply(this, args);
+    if (typeof cb === 'function') {
+      promisedCallback(promise, cb);
+    }
+    return promise;
+  });
+}
+
+// Promise finally util similar to Q.finally
+function fin(promise, finalPromiseFactory) {
+  return promise.then(function (res) {
+    return finalPromiseFactory().then(function () {
+      return res;
+    });
+  }, function (reason) {
+    return finalPromiseFactory().then(function () {
+      throw reason;
+    });
+  });
+}
+
+function sequentialize(queue, promiseFactory) {
+  return function () {
+    var args = arguments;
+    var that = this;
+    return queue.add(function () {
+      return promiseFactory.apply(that, args);
+    });
+  };
+}
+
+// uniq an array of strings, order not guaranteed
+// similar to underscore/lodash _.uniq
+function uniq(arr) {
+  var theSet = new pouchdb_collections__WEBPACK_IMPORTED_MODULE_0__.Set(arr);
+  var result = new Array(theSet.size);
+  var index = -1;
+  theSet.forEach(function (value) {
+    result[++index] = value;
+  });
+  return result;
+}
+
+function mapToKeysArray(map) {
+  var result = new Array(map.size);
+  var index = -1;
+  map.forEach(function (value, key) {
+    result[++index] = key;
+  });
+  return result;
+}
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-md5/lib/index-browser.es.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/pouchdb-md5/lib/index-browser.es.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "binaryMd5": () => (/* binding */ binaryMd5),
+/* harmony export */   "stringMd5": () => (/* binding */ stringMd5)
+/* harmony export */ });
+/* harmony import */ var pouchdb_binary_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-binary-utils */ "./node_modules/pouchdb-binary-utils/lib/index-browser.es.js");
+/* harmony import */ var spark_md5__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! spark-md5 */ "./node_modules/spark-md5/spark-md5.js");
+/* harmony import */ var spark_md5__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(spark_md5__WEBPACK_IMPORTED_MODULE_1__);
+
+
+
+var setImmediateShim = self.setImmediate || self.setTimeout;
+var MD5_CHUNK_SIZE = 32768;
+
+function rawToBase64(raw) {
+  return (0,pouchdb_binary_utils__WEBPACK_IMPORTED_MODULE_0__.btoa)(raw);
+}
+
+function sliceBlob(blob, start, end) {
+  if (blob.webkitSlice) {
+    return blob.webkitSlice(start, end);
+  }
+  return blob.slice(start, end);
+}
+
+function appendBlob(buffer, blob, start, end, callback) {
+  if (start > 0 || end < blob.size) {
+    // only slice blob if we really need to
+    blob = sliceBlob(blob, start, end);
+  }
+  (0,pouchdb_binary_utils__WEBPACK_IMPORTED_MODULE_0__.readAsArrayBuffer)(blob, function (arrayBuffer) {
+    buffer.append(arrayBuffer);
+    callback();
+  });
+}
+
+function appendString(buffer, string, start, end, callback) {
+  if (start > 0 || end < string.length) {
+    // only create a substring if we really need to
+    string = string.substring(start, end);
+  }
+  buffer.appendBinary(string);
+  callback();
+}
+
+function binaryMd5(data, callback) {
+  var inputIsString = typeof data === 'string';
+  var len = inputIsString ? data.length : data.size;
+  var chunkSize = Math.min(MD5_CHUNK_SIZE, len);
+  var chunks = Math.ceil(len / chunkSize);
+  var currentChunk = 0;
+  var buffer = inputIsString ? new (spark_md5__WEBPACK_IMPORTED_MODULE_1___default())() : new (spark_md5__WEBPACK_IMPORTED_MODULE_1___default().ArrayBuffer)();
+
+  var append = inputIsString ? appendString : appendBlob;
+
+  function next() {
+    setImmediateShim(loadNextChunk);
+  }
+
+  function done() {
+    var raw = buffer.end(true);
+    var base64 = rawToBase64(raw);
+    callback(base64);
+    buffer.destroy();
+  }
+
+  function loadNextChunk() {
+    var start = currentChunk * chunkSize;
+    var end = start + chunkSize;
+    currentChunk++;
+    if (currentChunk < chunks) {
+      append(buffer, data, start, end, next);
+    } else {
+      append(buffer, data, start, end, done);
+    }
+  }
+  loadNextChunk();
+}
+
+function stringMd5(string) {
+  return spark_md5__WEBPACK_IMPORTED_MODULE_1___default().hash(string);
+}
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-selector-core/lib/index.es.js":
+/*!************************************************************!*\
+  !*** ./node_modules/pouchdb-selector-core/lib/index.es.js ***!
+  \************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "massageSelector": () => (/* binding */ massageSelector),
+/* harmony export */   "matchesSelector": () => (/* binding */ matchesSelector),
+/* harmony export */   "filterInMemoryFields": () => (/* binding */ filterInMemoryFields),
+/* harmony export */   "createFieldSorter": () => (/* binding */ createFieldSorter),
+/* harmony export */   "rowFilter": () => (/* binding */ rowFilter),
+/* harmony export */   "isCombinationalField": () => (/* binding */ isCombinationalField),
+/* harmony export */   "getKey": () => (/* binding */ getKey),
+/* harmony export */   "getValue": () => (/* binding */ getValue),
+/* harmony export */   "getFieldFromDoc": () => (/* binding */ getFieldFromDoc),
+/* harmony export */   "setFieldInDoc": () => (/* binding */ setFieldInDoc),
+/* harmony export */   "compare": () => (/* binding */ compare),
+/* harmony export */   "parseField": () => (/* binding */ parseField)
+/* harmony export */ });
+/* harmony import */ var pouchdb_utils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-utils */ "./node_modules/pouchdb-utils/lib/index-browser.es.js");
+/* harmony import */ var pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-collate */ "./node_modules/pouchdb-collate/lib/index.es.js");
+
+
+
+// this would just be "return doc[field]", but fields
+// can be "deep" due to dot notation
+function getFieldFromDoc(doc, parsedField) {
+  var value = doc;
+  for (var i = 0, len = parsedField.length; i < len; i++) {
+    var key = parsedField[i];
+    value = value[key];
+    if (!value) {
+      break;
+    }
+  }
+  return value;
+}
+
+function setFieldInDoc(doc, parsedField, value) {
+  for (var i = 0, len = parsedField.length; i < len-1; i++) {
+    var elem = parsedField[i];
+    doc = doc[elem] = doc[elem] || {};
+  }
+  doc[parsedField[len-1]] = value;
+}
+
+function compare(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+// Converts a string in dot notation to an array of its components, with backslash escaping
+function parseField(fieldName) {
+  // fields may be deep (e.g. "foo.bar.baz"), so parse
+  var fields = [];
+  var current = '';
+  for (var i = 0, len = fieldName.length; i < len; i++) {
+    var ch = fieldName[i];
+    if (ch === '.') {
+      if (i > 0 && fieldName[i - 1] === '\\') { // escaped delimiter
+        current = current.substring(0, current.length - 1) + '.';
+      } else { // not escaped, so delimiter
+        fields.push(current);
+        current = '';
+      }
+    } else { // normal character
+      current += ch;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+var combinationFields = ['$or', '$nor', '$not'];
+function isCombinationalField(field) {
+  return combinationFields.indexOf(field) > -1;
+}
+
+function getKey(obj) {
+  return Object.keys(obj)[0];
+}
+
+function getValue(obj) {
+  return obj[getKey(obj)];
+}
+
+
+// flatten an array of selectors joined by an $and operator
+function mergeAndedSelectors(selectors) {
+
+  // sort to ensure that e.g. if the user specified
+  // $and: [{$gt: 'a'}, {$gt: 'b'}], then it's collapsed into
+  // just {$gt: 'b'}
+  var res = {};
+
+  selectors.forEach(function (selector) {
+    Object.keys(selector).forEach(function (field) {
+      var matcher = selector[field];
+      if (typeof matcher !== 'object') {
+        matcher = {$eq: matcher};
+      }
+
+      if (isCombinationalField(field)) {
+        if (matcher instanceof Array) {
+          res[field] = matcher.map(function (m) {
+            return mergeAndedSelectors([m]);
+          });
+        } else {
+          res[field] = mergeAndedSelectors([matcher]);
+        }
+      } else {
+        var fieldMatchers = res[field] = res[field] || {};
+        Object.keys(matcher).forEach(function (operator) {
+          var value = matcher[operator];
+
+          if (operator === '$gt' || operator === '$gte') {
+            return mergeGtGte(operator, value, fieldMatchers);
+          } else if (operator === '$lt' || operator === '$lte') {
+            return mergeLtLte(operator, value, fieldMatchers);
+          } else if (operator === '$ne') {
+            return mergeNe(value, fieldMatchers);
+          } else if (operator === '$eq') {
+            return mergeEq(value, fieldMatchers);
+          }
+          fieldMatchers[operator] = value;
+        });
+      }
+    });
+  });
+
+  return res;
+}
+
+
+
+// collapse logically equivalent gt/gte values
+function mergeGtGte(operator, value, fieldMatchers) {
+  if (typeof fieldMatchers.$eq !== 'undefined') {
+    return; // do nothing
+  }
+  if (typeof fieldMatchers.$gte !== 'undefined') {
+    if (operator === '$gte') {
+      if (value > fieldMatchers.$gte) { // more specificity
+        fieldMatchers.$gte = value;
+      }
+    } else { // operator === '$gt'
+      if (value >= fieldMatchers.$gte) { // more specificity
+        delete fieldMatchers.$gte;
+        fieldMatchers.$gt = value;
+      }
+    }
+  } else if (typeof fieldMatchers.$gt !== 'undefined') {
+    if (operator === '$gte') {
+      if (value > fieldMatchers.$gt) { // more specificity
+        delete fieldMatchers.$gt;
+        fieldMatchers.$gte = value;
+      }
+    } else { // operator === '$gt'
+      if (value > fieldMatchers.$gt) { // more specificity
+        fieldMatchers.$gt = value;
+      }
+    }
+  } else {
+    fieldMatchers[operator] = value;
+  }
+}
+
+// collapse logically equivalent lt/lte values
+function mergeLtLte(operator, value, fieldMatchers) {
+  if (typeof fieldMatchers.$eq !== 'undefined') {
+    return; // do nothing
+  }
+  if (typeof fieldMatchers.$lte !== 'undefined') {
+    if (operator === '$lte') {
+      if (value < fieldMatchers.$lte) { // more specificity
+        fieldMatchers.$lte = value;
+      }
+    } else { // operator === '$gt'
+      if (value <= fieldMatchers.$lte) { // more specificity
+        delete fieldMatchers.$lte;
+        fieldMatchers.$lt = value;
+      }
+    }
+  } else if (typeof fieldMatchers.$lt !== 'undefined') {
+    if (operator === '$lte') {
+      if (value < fieldMatchers.$lt) { // more specificity
+        delete fieldMatchers.$lt;
+        fieldMatchers.$lte = value;
+      }
+    } else { // operator === '$gt'
+      if (value < fieldMatchers.$lt) { // more specificity
+        fieldMatchers.$lt = value;
+      }
+    }
+  } else {
+    fieldMatchers[operator] = value;
+  }
+}
+
+// combine $ne values into one array
+function mergeNe(value, fieldMatchers) {
+  if ('$ne' in fieldMatchers) {
+    // there are many things this could "not" be
+    fieldMatchers.$ne.push(value);
+  } else { // doesn't exist yet
+    fieldMatchers.$ne = [value];
+  }
+}
+
+// add $eq into the mix
+function mergeEq(value, fieldMatchers) {
+  // these all have less specificity than the $eq
+  // TODO: check for user errors here
+  delete fieldMatchers.$gt;
+  delete fieldMatchers.$gte;
+  delete fieldMatchers.$lt;
+  delete fieldMatchers.$lte;
+  delete fieldMatchers.$ne;
+  fieldMatchers.$eq = value;
+}
+
+//#7458: execute function mergeAndedSelectors on nested $and
+function mergeAndedSelectorsNested(obj) {
+    for (var prop in obj) {
+        if (Array.isArray(obj)) {
+            for (var i in obj) {
+                if (obj[i]['$and']) {
+                    obj[i] = mergeAndedSelectors(obj[i]['$and']);
+                }
+            }
+        }
+        var value = obj[prop];
+        if (typeof value === 'object') {
+            mergeAndedSelectorsNested(value); // <- recursive call
+        }
+    }
+    return obj;
+}
+
+//#7458: determine id $and is present in selector (at any level)
+function isAndInSelector(obj, isAnd) {
+    for (var prop in obj) {
+        if (prop === '$and') {
+            isAnd = true;
+        }
+        var value = obj[prop];
+        if (typeof value === 'object') {
+            isAnd = isAndInSelector(value, isAnd); // <- recursive call
+        }
+    }
+    return isAnd;
+}
+
+//
+// normalize the selector
+//
+function massageSelector(input) {
+  var result = (0,pouchdb_utils__WEBPACK_IMPORTED_MODULE_0__.clone)(input);
+  var wasAnded = false;
+    //#7458: if $and is present in selector (at any level) merge nested $and
+    if (isAndInSelector(result, false)) {
+        result = mergeAndedSelectorsNested(result);
+        if ('$and' in result) {
+            result = mergeAndedSelectors(result['$and']);
+        }
+        wasAnded = true;
+    }
+
+  ['$or', '$nor'].forEach(function (orOrNor) {
+    if (orOrNor in result) {
+      // message each individual selector
+      // e.g. {foo: 'bar'} becomes {foo: {$eq: 'bar'}}
+      result[orOrNor].forEach(function (subSelector) {
+        var fields = Object.keys(subSelector);
+        for (var i = 0; i < fields.length; i++) {
+          var field = fields[i];
+          var matcher = subSelector[field];
+          if (typeof matcher !== 'object' || matcher === null) {
+            subSelector[field] = {$eq: matcher};
+          }
+        }
+      });
+    }
+  });
+
+  if ('$not' in result) {
+    //This feels a little like forcing, but it will work for now,
+    //I would like to come back to this and make the merging of selectors a little more generic
+    result['$not'] = mergeAndedSelectors([result['$not']]);
+  }
+
+  var fields = Object.keys(result);
+
+  for (var i = 0; i < fields.length; i++) {
+    var field = fields[i];
+    var matcher = result[field];
+
+    if (typeof matcher !== 'object' || matcher === null) {
+      matcher = {$eq: matcher};
+    } else if ('$ne' in matcher && !wasAnded) {
+      // I put these in an array, since there may be more than one
+      // but in the "mergeAnded" operation, I already take care of that
+      matcher.$ne = [matcher.$ne];
+    }
+    result[field] = matcher;
+  }
+
+  return result;
+}
+
+// create a comparator based on the sort object
+function createFieldSorter(sort) {
+
+  function getFieldValuesAsArray(doc) {
+    return sort.map(function (sorting) {
+      var fieldName = getKey(sorting);
+      var parsedField = parseField(fieldName);
+      var docFieldValue = getFieldFromDoc(doc, parsedField);
+      return docFieldValue;
+    });
+  }
+
+  return function (aRow, bRow) {
+    var aFieldValues = getFieldValuesAsArray(aRow.doc);
+    var bFieldValues = getFieldValuesAsArray(bRow.doc);
+    var collation = (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(aFieldValues, bFieldValues);
+    if (collation !== 0) {
+      return collation;
+    }
+    // this is what mango seems to do
+    return compare(aRow.doc._id, bRow.doc._id);
+  };
+}
+
+function filterInMemoryFields(rows, requestDef, inMemoryFields) {
+  rows = rows.filter(function (row) {
+    return rowFilter(row.doc, requestDef.selector, inMemoryFields);
+  });
+
+  if (requestDef.sort) {
+    // in-memory sort
+    var fieldSorter = createFieldSorter(requestDef.sort);
+    rows = rows.sort(fieldSorter);
+    if (typeof requestDef.sort[0] !== 'string' &&
+        getValue(requestDef.sort[0]) === 'desc') {
+      rows = rows.reverse();
+    }
+  }
+
+  if ('limit' in requestDef || 'skip' in requestDef) {
+    // have to do the limit in-memory
+    var skip = requestDef.skip || 0;
+    var limit = ('limit' in requestDef ? requestDef.limit : rows.length) + skip;
+    rows = rows.slice(skip, limit);
+  }
+  return rows;
+}
+
+function rowFilter(doc, selector, inMemoryFields) {
+  return inMemoryFields.every(function (field) {
+    var matcher = selector[field];
+    var parsedField = parseField(field);
+    var docFieldValue = getFieldFromDoc(doc, parsedField);
+    if (isCombinationalField(field)) {
+      return matchCominationalSelector(field, matcher, doc);
+    }
+
+    return matchSelector(matcher, doc, parsedField, docFieldValue);
+  });
+}
+
+function matchSelector(matcher, doc, parsedField, docFieldValue) {
+  if (!matcher) {
+    // no filtering necessary; this field is just needed for sorting
+    return true;
+  }
+
+  // is matcher an object, if so continue recursion
+  if (typeof matcher === 'object') {
+    return Object.keys(matcher).every(function (userOperator) {
+      var userValue = matcher[userOperator];
+      return match(userOperator, doc, userValue, parsedField, docFieldValue);
+    });
+  }
+
+  // no more depth, No need to recurse further
+  return matcher === docFieldValue;
+}
+
+function matchCominationalSelector(field, matcher, doc) {
+
+  if (field === '$or') {
+    return matcher.some(function (orMatchers) {
+      return rowFilter(doc, orMatchers, Object.keys(orMatchers));
+    });
+  }
+
+  if (field === '$not') {
+    return !rowFilter(doc, matcher, Object.keys(matcher));
+  }
+
+  //`$nor`
+  return !matcher.find(function (orMatchers) {
+    return rowFilter(doc, orMatchers, Object.keys(orMatchers));
+  });
+
+}
+
+function match(userOperator, doc, userValue, parsedField, docFieldValue) {
+  if (!matchers[userOperator]) {
+    throw new Error('unknown operator "' + userOperator +
+      '" - should be one of $eq, $lte, $lt, $gt, $gte, $exists, $ne, $in, ' +
+      '$nin, $size, $mod, $regex, $elemMatch, $type, $allMatch or $all');
+  }
+  return matchers[userOperator](doc, userValue, parsedField, docFieldValue);
+}
+
+function fieldExists(docFieldValue) {
+  return typeof docFieldValue !== 'undefined' && docFieldValue !== null;
+}
+
+function fieldIsNotUndefined(docFieldValue) {
+  return typeof docFieldValue !== 'undefined';
+}
+
+function modField(docFieldValue, userValue) {
+  var divisor = userValue[0];
+  var mod = userValue[1];
+  if (divisor === 0) {
+    throw new Error('Bad divisor, cannot divide by zero');
+  }
+
+  if (parseInt(divisor, 10) !== divisor ) {
+    throw new Error('Divisor is not an integer');
+  }
+
+  if (parseInt(mod, 10) !== mod ) {
+    throw new Error('Modulus is not an integer');
+  }
+
+  if (parseInt(docFieldValue, 10) !== docFieldValue) {
+    return false;
+  }
+
+  return docFieldValue % divisor === mod;
+}
+
+function arrayContainsValue(docFieldValue, userValue) {
+  return userValue.some(function (val) {
+    if (docFieldValue instanceof Array) {
+      return docFieldValue.indexOf(val) > -1;
+    }
+
+    return docFieldValue === val;
+  });
+}
+
+function arrayContainsAllValues(docFieldValue, userValue) {
+  return userValue.every(function (val) {
+    return docFieldValue.indexOf(val) > -1;
+  });
+}
+
+function arraySize(docFieldValue, userValue) {
+  return docFieldValue.length === userValue;
+}
+
+function regexMatch(docFieldValue, userValue) {
+  var re = new RegExp(userValue);
+
+  return re.test(docFieldValue);
+}
+
+function typeMatch(docFieldValue, userValue) {
+
+  switch (userValue) {
+    case 'null':
+      return docFieldValue === null;
+    case 'boolean':
+      return typeof (docFieldValue) === 'boolean';
+    case 'number':
+      return typeof (docFieldValue) === 'number';
+    case 'string':
+      return typeof (docFieldValue) === 'string';
+    case 'array':
+      return docFieldValue instanceof Array;
+    case 'object':
+      return ({}).toString.call(docFieldValue) === '[object Object]';
+  }
+
+  throw new Error(userValue + ' not supported as a type.' +
+                  'Please use one of object, string, array, number, boolean or null.');
+
+}
+
+var matchers = {
+
+  '$elemMatch': function (doc, userValue, parsedField, docFieldValue) {
+    if (!Array.isArray(docFieldValue)) {
+      return false;
+    }
+
+    if (docFieldValue.length === 0) {
+      return false;
+    }
+
+    if (typeof docFieldValue[0] === 'object') {
+      return docFieldValue.some(function (val) {
+        return rowFilter(val, userValue, Object.keys(userValue));
+      });
+    }
+
+    return docFieldValue.some(function (val) {
+      return matchSelector(userValue, doc, parsedField, val);
+    });
+  },
+
+  '$allMatch': function (doc, userValue, parsedField, docFieldValue) {
+    if (!Array.isArray(docFieldValue)) {
+      return false;
+    }
+
+    /* istanbul ignore next */
+    if (docFieldValue.length === 0) {
+      return false;
+    }
+
+    if (typeof docFieldValue[0] === 'object') {
+      return docFieldValue.every(function (val) {
+        return rowFilter(val, userValue, Object.keys(userValue));
+      });
+    }
+
+    return docFieldValue.every(function (val) {
+      return matchSelector(userValue, doc, parsedField, val);
+    });
+  },
+
+  '$eq': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) === 0;
+  },
+
+  '$gte': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) >= 0;
+  },
+
+  '$gt': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) > 0;
+  },
+
+  '$lte': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) <= 0;
+  },
+
+  '$lt': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldIsNotUndefined(docFieldValue) && (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, userValue) < 0;
+  },
+
+  '$exists': function (doc, userValue, parsedField, docFieldValue) {
+    //a field that is null is still considered to exist
+    if (userValue) {
+      return fieldIsNotUndefined(docFieldValue);
+    }
+
+    return !fieldIsNotUndefined(docFieldValue);
+  },
+
+  '$mod': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldExists(docFieldValue) && modField(docFieldValue, userValue);
+  },
+
+  '$ne': function (doc, userValue, parsedField, docFieldValue) {
+    return userValue.every(function (neValue) {
+      return (0,pouchdb_collate__WEBPACK_IMPORTED_MODULE_1__.collate)(docFieldValue, neValue) !== 0;
+    });
+  },
+  '$in': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldExists(docFieldValue) && arrayContainsValue(docFieldValue, userValue);
+  },
+
+  '$nin': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldExists(docFieldValue) && !arrayContainsValue(docFieldValue, userValue);
+  },
+
+  '$size': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldExists(docFieldValue) && arraySize(docFieldValue, userValue);
+  },
+
+  '$all': function (doc, userValue, parsedField, docFieldValue) {
+    return Array.isArray(docFieldValue) && arrayContainsAllValues(docFieldValue, userValue);
+  },
+
+  '$regex': function (doc, userValue, parsedField, docFieldValue) {
+    return fieldExists(docFieldValue) && regexMatch(docFieldValue, userValue);
+  },
+
+  '$type': function (doc, userValue, parsedField, docFieldValue) {
+    return typeMatch(docFieldValue, userValue);
+  }
+};
+
+// return true if the given doc matches the supplied selector
+function matchesSelector(doc, selector) {
+  /* istanbul ignore if */
+  if (typeof selector !== 'object') {
+    // match the CouchDB error message
+    throw new Error('Selector error: expected a JSON object');
+  }
+
+  selector = massageSelector(selector);
+  var row = {
+    'doc': doc
+  };
+
+  var rowsMatched = filterInMemoryFields([row], { 'selector': selector }, Object.keys(selector));
+  return rowsMatched && rowsMatched.length === 1;
+}
+
+
+
+
+/***/ }),
+
+/***/ "./node_modules/pouchdb-utils/lib/index-browser.es.js":
+/*!************************************************************!*\
+  !*** ./node_modules/pouchdb-utils/lib/index-browser.es.js ***!
+  \************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "adapterFun": () => (/* binding */ adapterFun),
+/* harmony export */   "assign": () => (/* binding */ assign$1),
+/* harmony export */   "bulkGetShim": () => (/* binding */ bulkGet),
+/* harmony export */   "changesHandler": () => (/* binding */ Changes),
+/* harmony export */   "clone": () => (/* binding */ clone),
+/* harmony export */   "defaultBackOff": () => (/* binding */ defaultBackOff),
+/* harmony export */   "explainError": () => (/* binding */ explainError),
+/* harmony export */   "filterChange": () => (/* binding */ filterChange),
+/* harmony export */   "flatten": () => (/* binding */ flatten),
+/* harmony export */   "functionName": () => (/* binding */ res$1),
+/* harmony export */   "guardedConsole": () => (/* binding */ guardedConsole),
+/* harmony export */   "hasLocalStorage": () => (/* binding */ hasLocalStorage),
+/* harmony export */   "invalidIdError": () => (/* binding */ invalidIdError),
+/* harmony export */   "isRemote": () => (/* binding */ isRemote),
+/* harmony export */   "listenerCount": () => (/* binding */ listenerCount),
+/* harmony export */   "nextTick": () => (/* reexport default from dynamic */ immediate__WEBPACK_IMPORTED_MODULE_3___default.a),
+/* harmony export */   "normalizeDdocFunctionName": () => (/* binding */ normalizeDesignDocFunctionName),
+/* harmony export */   "once": () => (/* binding */ once),
+/* harmony export */   "parseDdocFunctionName": () => (/* binding */ parseDesignDocFunctionName),
+/* harmony export */   "parseUri": () => (/* binding */ parseUri),
+/* harmony export */   "pick": () => (/* binding */ pick),
+/* harmony export */   "rev": () => (/* binding */ rev),
+/* harmony export */   "scopeEval": () => (/* binding */ scopeEval),
+/* harmony export */   "toPromise": () => (/* binding */ toPromise),
+/* harmony export */   "upsert": () => (/* binding */ upsert),
+/* harmony export */   "uuid": () => (/* binding */ uuid)
+/* harmony export */ });
+/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! argsarray */ "./node_modules/argsarray/index.js");
+/* harmony import */ var argsarray__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(argsarray__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var pouchdb_collections__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-collections */ "./node_modules/pouchdb-collections/lib/index.es.js");
+/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! inherits */ "./node_modules/inherits/inherits_browser.js");
+/* harmony import */ var inherits__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(inherits__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var immediate__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! immediate */ "./node_modules/immediate/lib/index.js");
+/* harmony import */ var immediate__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(immediate__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! pouchdb-errors */ "./node_modules/pouchdb-errors/lib/index.es.js");
+/* harmony import */ var events__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! events */ "./node_modules/events/events.js");
+/* harmony import */ var events__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(events__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var uuid__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! uuid */ "./node_modules/uuid/wrapper.mjs");
+/* harmony import */ var pouchdb_md5__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! pouchdb-md5 */ "./node_modules/pouchdb-md5/lib/index-browser.es.js");
+
+
+
+
+
+
+
+
+
+function isBinaryObject(object) {
+  return (typeof ArrayBuffer !== 'undefined' && object instanceof ArrayBuffer) ||
+    (typeof Blob !== 'undefined' && object instanceof Blob);
+}
+
+function cloneArrayBuffer(buff) {
+  if (typeof buff.slice === 'function') {
+    return buff.slice(0);
+  }
+  // IE10-11 slice() polyfill
+  var target = new ArrayBuffer(buff.byteLength);
+  var targetArray = new Uint8Array(target);
+  var sourceArray = new Uint8Array(buff);
+  targetArray.set(sourceArray);
+  return target;
+}
+
+function cloneBinaryObject(object) {
+  if (object instanceof ArrayBuffer) {
+    return cloneArrayBuffer(object);
+  }
+  var size = object.size;
+  var type = object.type;
+  // Blob
+  if (typeof object.slice === 'function') {
+    return object.slice(0, size, type);
+  }
+  // PhantomJS slice() replacement
+  return object.webkitSlice(0, size, type);
+}
+
+// most of this is borrowed from lodash.isPlainObject:
+// https://github.com/fis-components/lodash.isplainobject/
+// blob/29c358140a74f252aeb08c9eb28bef86f2217d4a/index.js
+
+var funcToString = Function.prototype.toString;
+var objectCtorString = funcToString.call(Object);
+
+function isPlainObject(value) {
+  var proto = Object.getPrototypeOf(value);
+  /* istanbul ignore if */
+  if (proto === null) { // not sure when this happens, but I guess it can
+    return true;
+  }
+  var Ctor = proto.constructor;
+  return (typeof Ctor == 'function' &&
+    Ctor instanceof Ctor && funcToString.call(Ctor) == objectCtorString);
+}
+
+function clone(object) {
+  var newObject;
+  var i;
+  var len;
+
+  if (!object || typeof object !== 'object') {
+    return object;
+  }
+
+  if (Array.isArray(object)) {
+    newObject = [];
+    for (i = 0, len = object.length; i < len; i++) {
+      newObject[i] = clone(object[i]);
+    }
+    return newObject;
+  }
+
+  // special case: to avoid inconsistencies between IndexedDB
+  // and other backends, we automatically stringify Dates
+  if (object instanceof Date) {
+    return object.toISOString();
+  }
+
+  if (isBinaryObject(object)) {
+    return cloneBinaryObject(object);
+  }
+
+  if (!isPlainObject(object)) {
+    return object; // don't clone objects like Workers
+  }
+
+  newObject = {};
+  for (i in object) {
+    /* istanbul ignore else */
+    if (Object.prototype.hasOwnProperty.call(object, i)) {
+      var value = clone(object[i]);
+      if (typeof value !== 'undefined') {
+        newObject[i] = value;
+      }
+    }
+  }
+  return newObject;
+}
+
+function once(fun) {
+  var called = false;
+  return argsarray__WEBPACK_IMPORTED_MODULE_0___default()(function (args) {
+    /* istanbul ignore if */
+    if (called) {
+      // this is a smoke test and should never actually happen
+      throw new Error('once called more than once');
+    } else {
+      called = true;
+      fun.apply(this, args);
+    }
+  });
+}
+
+function toPromise(func) {
+  //create the function we will be returning
+  return argsarray__WEBPACK_IMPORTED_MODULE_0___default()(function (args) {
+    // Clone arguments
+    args = clone(args);
+    var self = this;
+    // if the last argument is a function, assume its a callback
+    var usedCB = (typeof args[args.length - 1] === 'function') ? args.pop() : false;
+    var promise = new Promise(function (fulfill, reject) {
+      var resp;
+      try {
+        var callback = once(function (err, mesg) {
+          if (err) {
+            reject(err);
+          } else {
+            fulfill(mesg);
+          }
+        });
+        // create a callback for this invocation
+        // apply the function in the orig context
+        args.push(callback);
+        resp = func.apply(self, args);
+        if (resp && typeof resp.then === 'function') {
+          fulfill(resp);
+        }
+      } catch (e) {
+        reject(e);
+      }
+    });
+    // if there is a callback, call it back
+    if (usedCB) {
+      promise.then(function (result) {
+        usedCB(null, result);
+      }, usedCB);
+    }
+    return promise;
+  });
+}
+
+function logApiCall(self, name, args) {
+  /* istanbul ignore if */
+  if (self.constructor.listeners('debug').length) {
+    var logArgs = ['api', self.name, name];
+    for (var i = 0; i < args.length - 1; i++) {
+      logArgs.push(args[i]);
+    }
+    self.constructor.emit('debug', logArgs);
+
+    // override the callback itself to log the response
+    var origCallback = args[args.length - 1];
+    args[args.length - 1] = function (err, res) {
+      var responseArgs = ['api', self.name, name];
+      responseArgs = responseArgs.concat(
+        err ? ['error', err] : ['success', res]
+      );
+      self.constructor.emit('debug', responseArgs);
+      origCallback(err, res);
+    };
+  }
+}
+
+function adapterFun(name, callback) {
+  return toPromise(argsarray__WEBPACK_IMPORTED_MODULE_0___default()(function (args) {
+    if (this._closed) {
+      return Promise.reject(new Error('database is closed'));
+    }
+    if (this._destroyed) {
+      return Promise.reject(new Error('database is destroyed'));
+    }
+    var self = this;
+    logApiCall(self, name, args);
+    if (!this.taskqueue.isReady) {
+      return new Promise(function (fulfill, reject) {
+        self.taskqueue.addTask(function (failed) {
+          if (failed) {
+            reject(failed);
+          } else {
+            fulfill(self[name].apply(self, args));
+          }
+        });
+      });
+    }
+    return callback.apply(this, args);
+  }));
+}
+
+// like underscore/lodash _.pick()
+function pick(obj, arr) {
+  var res = {};
+  for (var i = 0, len = arr.length; i < len; i++) {
+    var prop = arr[i];
+    if (prop in obj) {
+      res[prop] = obj[prop];
+    }
+  }
+  return res;
+}
+
+// Most browsers throttle concurrent requests at 6, so it's silly
+// to shim _bulk_get by trying to launch potentially hundreds of requests
+// and then letting the majority time out. We can handle this ourselves.
+var MAX_NUM_CONCURRENT_REQUESTS = 6;
+
+function identityFunction(x) {
+  return x;
+}
+
+function formatResultForOpenRevsGet(result) {
+  return [{
+    ok: result
+  }];
+}
+
+// shim for P/CouchDB adapters that don't directly implement _bulk_get
+function bulkGet(db, opts, callback) {
+  var requests = opts.docs;
+
+  // consolidate into one request per doc if possible
+  var requestsById = new pouchdb_collections__WEBPACK_IMPORTED_MODULE_1__.Map();
+  requests.forEach(function (request) {
+    if (requestsById.has(request.id)) {
+      requestsById.get(request.id).push(request);
+    } else {
+      requestsById.set(request.id, [request]);
+    }
+  });
+
+  var numDocs = requestsById.size;
+  var numDone = 0;
+  var perDocResults = new Array(numDocs);
+
+  function collapseResultsAndFinish() {
+    var results = [];
+    perDocResults.forEach(function (res) {
+      res.docs.forEach(function (info) {
+        results.push({
+          id: res.id,
+          docs: [info]
+        });
+      });
+    });
+    callback(null, {results: results});
+  }
+
+  function checkDone() {
+    if (++numDone === numDocs) {
+      collapseResultsAndFinish();
+    }
+  }
+
+  function gotResult(docIndex, id, docs) {
+    perDocResults[docIndex] = {id: id, docs: docs};
+    checkDone();
+  }
+
+  var allRequests = [];
+  requestsById.forEach(function (value, key) {
+    allRequests.push(key);
+  });
+
+  var i = 0;
+
+  function nextBatch() {
+
+    if (i >= allRequests.length) {
+      return;
+    }
+
+    var upTo = Math.min(i + MAX_NUM_CONCURRENT_REQUESTS, allRequests.length);
+    var batch = allRequests.slice(i, upTo);
+    processBatch(batch, i);
+    i += batch.length;
+  }
+
+  function processBatch(batch, offset) {
+    batch.forEach(function (docId, j) {
+      var docIdx = offset + j;
+      var docRequests = requestsById.get(docId);
+
+      // just use the first request as the "template"
+      // TODO: The _bulk_get API allows for more subtle use cases than this,
+      // but for now it is unlikely that there will be a mix of different
+      // "atts_since" or "attachments" in the same request, since it's just
+      // replicate.js that is using this for the moment.
+      // Also, atts_since is aspirational, since we don't support it yet.
+      var docOpts = pick(docRequests[0], ['atts_since', 'attachments']);
+      docOpts.open_revs = docRequests.map(function (request) {
+        // rev is optional, open_revs disallowed
+        return request.rev;
+      });
+
+      // remove falsey / undefined revisions
+      docOpts.open_revs = docOpts.open_revs.filter(identityFunction);
+
+      var formatResult = identityFunction;
+
+      if (docOpts.open_revs.length === 0) {
+        delete docOpts.open_revs;
+
+        // when fetching only the "winning" leaf,
+        // transform the result so it looks like an open_revs
+        // request
+        formatResult = formatResultForOpenRevsGet;
+      }
+
+      // globally-supplied options
+      ['revs', 'attachments', 'binary', 'ajax', 'latest'].forEach(function (param) {
+        if (param in opts) {
+          docOpts[param] = opts[param];
+        }
+      });
+      db.get(docId, docOpts, function (err, res) {
+        var result;
+        /* istanbul ignore if */
+        if (err) {
+          result = [{error: err}];
+        } else {
+          result = formatResult(res);
+        }
+        gotResult(docIdx, docId, result);
+        nextBatch();
+      });
+    });
+  }
+
+  nextBatch();
+
+}
+
+var hasLocal;
+
+try {
+  localStorage.setItem('_pouch_check_localstorage', 1);
+  hasLocal = !!localStorage.getItem('_pouch_check_localstorage');
+} catch (e) {
+  hasLocal = false;
+}
+
+function hasLocalStorage() {
+  return hasLocal;
+}
+
+// Custom nextTick() shim for browsers. In node, this will just be process.nextTick(). We
+
+inherits__WEBPACK_IMPORTED_MODULE_2___default()(Changes, (events__WEBPACK_IMPORTED_MODULE_5___default()));
+
+/* istanbul ignore next */
+function attachBrowserEvents(self) {
+  if (hasLocalStorage()) {
+    addEventListener("storage", function (e) {
+      self.emit(e.key);
+    });
+  }
+}
+
+function Changes() {
+  events__WEBPACK_IMPORTED_MODULE_5___default().call(this);
+  this._listeners = {};
+
+  attachBrowserEvents(this);
+}
+Changes.prototype.addListener = function (dbName, id, db, opts) {
+  /* istanbul ignore if */
+  if (this._listeners[id]) {
+    return;
+  }
+  var self = this;
+  var inprogress = false;
+  function eventFunction() {
+    /* istanbul ignore if */
+    if (!self._listeners[id]) {
+      return;
+    }
+    if (inprogress) {
+      inprogress = 'waiting';
+      return;
+    }
+    inprogress = true;
+    var changesOpts = pick(opts, [
+      'style', 'include_docs', 'attachments', 'conflicts', 'filter',
+      'doc_ids', 'view', 'since', 'query_params', 'binary', 'return_docs'
+    ]);
+
+    /* istanbul ignore next */
+    function onError() {
+      inprogress = false;
+    }
+
+    db.changes(changesOpts).on('change', function (c) {
+      if (c.seq > opts.since && !opts.cancelled) {
+        opts.since = c.seq;
+        opts.onChange(c);
+      }
+    }).on('complete', function () {
+      if (inprogress === 'waiting') {
+        immediate__WEBPACK_IMPORTED_MODULE_3___default()(eventFunction);
+      }
+      inprogress = false;
+    }).on('error', onError);
+  }
+  this._listeners[id] = eventFunction;
+  this.on(dbName, eventFunction);
+};
+
+Changes.prototype.removeListener = function (dbName, id) {
+  /* istanbul ignore if */
+  if (!(id in this._listeners)) {
+    return;
+  }
+  events__WEBPACK_IMPORTED_MODULE_5___default().prototype.removeListener.call(this, dbName,
+    this._listeners[id]);
+  delete this._listeners[id];
+};
+
+
+/* istanbul ignore next */
+Changes.prototype.notifyLocalWindows = function (dbName) {
+  //do a useless change on a storage thing
+  //in order to get other windows's listeners to activate
+  if (hasLocalStorage()) {
+    localStorage[dbName] = (localStorage[dbName] === "a") ? "b" : "a";
+  }
+};
+
+Changes.prototype.notify = function (dbName) {
+  this.emit(dbName);
+  this.notifyLocalWindows(dbName);
+};
+
+function guardedConsole(method) {
+  /* istanbul ignore else */
+  if (typeof console !== 'undefined' && typeof console[method] === 'function') {
+    var args = Array.prototype.slice.call(arguments, 1);
+    console[method].apply(console, args);
+  }
+}
+
+function randomNumber(min, max) {
+  var maxTimeout = 600000; // Hard-coded default of 10 minutes
+  min = parseInt(min, 10) || 0;
+  max = parseInt(max, 10);
+  if (max !== max || max <= min) {
+    max = (min || 1) << 1; //doubling
+  } else {
+    max = max + 1;
+  }
+  // In order to not exceed maxTimeout, pick a random value between half of maxTimeout and maxTimeout
+  if (max > maxTimeout) {
+    min = maxTimeout >> 1; // divide by two
+    max = maxTimeout;
+  }
+  var ratio = Math.random();
+  var range = max - min;
+
+  return ~~(range * ratio + min); // ~~ coerces to an int, but fast.
+}
+
+function defaultBackOff(min) {
+  var max = 0;
+  if (!min) {
+    max = 2000;
+  }
+  return randomNumber(min, max);
+}
+
+// designed to give info to browser users, who are disturbed
+// when they see http errors in the console
+function explainError(status, str) {
+  guardedConsole('info', 'The above ' + status + ' is totally normal. ' + str);
+}
+
+var assign;
+{
+  if (typeof Object.assign === 'function') {
+    assign = Object.assign;
+  } else {
+    // lite Object.assign polyfill based on
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+    assign = function (target) {
+      var to = Object(target);
+
+      for (var index = 1; index < arguments.length; index++) {
+        var nextSource = arguments[index];
+
+        if (nextSource != null) { // Skip over if undefined or null
+          for (var nextKey in nextSource) {
+            // Avoid bugs when hasOwnProperty is shadowed
+            if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+              to[nextKey] = nextSource[nextKey];
+            }
+          }
+        }
+      }
+      return to;
+    };
+  }
+}
+
+var assign$1 = assign;
+
+function tryFilter(filter, doc, req) {
+  try {
+    return !filter(doc, req);
+  } catch (err) {
+    var msg = 'Filter function threw: ' + err.toString();
+    return (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.BAD_REQUEST, msg);
+  }
+}
+
+function filterChange(opts) {
+  var req = {};
+  var hasFilter = opts.filter && typeof opts.filter === 'function';
+  req.query = opts.query_params;
+
+  return function filter(change) {
+    if (!change.doc) {
+      // CSG sends events on the changes feed that don't have documents,
+      // this hack makes a whole lot of existing code robust.
+      change.doc = {};
+    }
+
+    var filterReturn = hasFilter && tryFilter(opts.filter, change.doc, req);
+
+    if (typeof filterReturn === 'object') {
+      return filterReturn;
+    }
+
+    if (filterReturn) {
+      return false;
+    }
+
+    if (!opts.include_docs) {
+      delete change.doc;
+    } else if (!opts.attachments) {
+      for (var att in change.doc._attachments) {
+        /* istanbul ignore else */
+        if (change.doc._attachments.hasOwnProperty(att)) {
+          change.doc._attachments[att].stub = true;
+        }
+      }
+    }
+    return true;
+  };
+}
+
+function flatten(arrs) {
+  var res = [];
+  for (var i = 0, len = arrs.length; i < len; i++) {
+    res = res.concat(arrs[i]);
+  }
+  return res;
+}
+
+// shim for Function.prototype.name,
+// for browsers that don't support it like IE
+
+/* istanbul ignore next */
+function f() {}
+
+var hasName = f.name;
+var res;
+
+// We dont run coverage in IE
+/* istanbul ignore else */
+if (hasName) {
+  res = function (fun) {
+    return fun.name;
+  };
+} else {
+  res = function (fun) {
+    var match = fun.toString().match(/^\s*function\s*(?:(\S+)\s*)?\(/);
+    if (match && match[1]) {
+      return match[1];
+    }
+    else {
+      return '';
+    }
+  };
+}
+
+var res$1 = res;
+
+// Determine id an ID is valid
+//   - invalid IDs begin with an underescore that does not begin '_design' or
+//     '_local'
+//   - any other string value is a valid id
+// Returns the specific error object for each case
+function invalidIdError(id) {
+  var err;
+  if (!id) {
+    err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.MISSING_ID);
+  } else if (typeof id !== 'string') {
+    err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.INVALID_ID);
+  } else if (/^_/.test(id) && !(/^_(design|local)/).test(id)) {
+    err = (0,pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.createError)(pouchdb_errors__WEBPACK_IMPORTED_MODULE_4__.RESERVED_ID);
+  }
+  if (err) {
+    throw err;
+  }
+}
+
+// Checks if a PouchDB object is "remote" or not. This is
+
+function isRemote(db) {
+  if (typeof db._remote === 'boolean') {
+    return db._remote;
+  }
+  /* istanbul ignore next */
+  if (typeof db.type === 'function') {
+    guardedConsole('warn',
+      'db.type() is deprecated and will be removed in ' +
+      'a future version of PouchDB');
+    return db.type() === 'http';
+  }
+  /* istanbul ignore next */
+  return false;
+}
+
+function listenerCount(ee, type) {
+  return 'listenerCount' in ee ? ee.listenerCount(type) :
+                                 events__WEBPACK_IMPORTED_MODULE_5___default().listenerCount(ee, type);
+}
+
+function parseDesignDocFunctionName(s) {
+  if (!s) {
+    return null;
+  }
+  var parts = s.split('/');
+  if (parts.length === 2) {
+    return parts;
+  }
+  if (parts.length === 1) {
+    return [s, s];
+  }
+  return null;
+}
+
+function normalizeDesignDocFunctionName(s) {
+  var normalized = parseDesignDocFunctionName(s);
+  return normalized ? normalized.join('/') : null;
+}
+
+// originally parseUri 1.2.2, now patched by us
+// (c) Steven Levithan <stevenlevithan.com>
+// MIT License
+var keys = ["source", "protocol", "authority", "userInfo", "user", "password",
+    "host", "port", "relative", "path", "directory", "file", "query", "anchor"];
+var qName ="queryKey";
+var qParser = /(?:^|&)([^&=]*)=?([^&]*)/g;
+
+// use the "loose" parser
+/* eslint maxlen: 0, no-useless-escape: 0 */
+var parser = /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
+
+function parseUri(str) {
+  var m = parser.exec(str);
+  var uri = {};
+  var i = 14;
+
+  while (i--) {
+    var key = keys[i];
+    var value = m[i] || "";
+    var encoded = ['user', 'password'].indexOf(key) !== -1;
+    uri[key] = encoded ? decodeURIComponent(value) : value;
+  }
+
+  uri[qName] = {};
+  uri[keys[12]].replace(qParser, function ($0, $1, $2) {
+    if ($1) {
+      uri[qName][$1] = $2;
+    }
+  });
+
+  return uri;
+}
+
+// Based on https://github.com/alexdavid/scope-eval v0.0.3
+// (source: https://unpkg.com/scope-eval@0.0.3/scope_eval.js)
+// This is basically just a wrapper around new Function()
+
+function scopeEval(source, scope) {
+  var keys = [];
+  var values = [];
+  for (var key in scope) {
+    if (scope.hasOwnProperty(key)) {
+      keys.push(key);
+      values.push(scope[key]);
+    }
+  }
+  keys.push(source);
+  return Function.apply(null, keys).apply(null, values);
+}
+
+// this is essentially the "update sugar" function from daleharvey/pouchdb#1388
+// the diffFun tells us what delta to apply to the doc.  it either returns
+// the doc, or false if it doesn't need to do an update after all
+function upsert(db, docId, diffFun) {
+  return new Promise(function (fulfill, reject) {
+    db.get(docId, function (err, doc) {
+      if (err) {
+        /* istanbul ignore next */
+        if (err.status !== 404) {
+          return reject(err);
+        }
+        doc = {};
+      }
+
+      // the user might change the _rev, so save it for posterity
+      var docRev = doc._rev;
+      var newDoc = diffFun(doc);
+
+      if (!newDoc) {
+        // if the diffFun returns falsy, we short-circuit as
+        // an optimization
+        return fulfill({updated: false, rev: docRev});
+      }
+
+      // users aren't allowed to modify these values,
+      // so reset them here
+      newDoc._id = docId;
+      newDoc._rev = docRev;
+      fulfill(tryAndPut(db, newDoc, diffFun));
+    });
+  });
+}
+
+function tryAndPut(db, doc, diffFun) {
+  return db.put(doc).then(function (res) {
+    return {
+      updated: true,
+      rev: res.rev
+    };
+  }, function (err) {
+    /* istanbul ignore next */
+    if (err.status !== 409) {
+      throw err;
+    }
+    return upsert(db, doc._id, diffFun);
+  });
+}
+
+function rev(doc, deterministic_revs) {
+  var clonedDoc = clone(doc);
+  if (!deterministic_revs) {
+    return (0,uuid__WEBPACK_IMPORTED_MODULE_7__.v4)().replace(/-/g, '').toLowerCase();
+  }
+
+  delete clonedDoc._rev_tree;
+  return (0,pouchdb_md5__WEBPACK_IMPORTED_MODULE_6__.stringMd5)(JSON.stringify(clonedDoc));
+}
+
+var uuid = uuid__WEBPACK_IMPORTED_MODULE_7__.v4; // mimic old import, only v4 is ever used elsewhere
+
+
 
 
 /***/ }),
@@ -16921,9 +16919,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./repository/BookmarkDao */ "./src/background/bookmark/repository/BookmarkDao.ts");
 /* harmony import */ var _handler_CreateBookmarkHandler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./handler/CreateBookmarkHandler */ "./src/background/bookmark/handler/CreateBookmarkHandler.ts");
-/* harmony import */ var _handler_DeleteBookmarkHandler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./handler/DeleteBookmarkHandler */ "./src/background/bookmark/handler/DeleteBookmarkHandler.ts");
-/* harmony import */ var _handler_UpdateBookmarkHandler__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./handler/UpdateBookmarkHandler */ "./src/background/bookmark/handler/UpdateBookmarkHandler.ts");
+/* harmony import */ var _handler_RemoveBookmarkHandler__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./handler/RemoveBookmarkHandler */ "./src/background/bookmark/handler/RemoveBookmarkHandler.ts");
+/* harmony import */ var _handler_ChangeBookmarkHandler__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./handler/ChangeBookmarkHandler */ "./src/background/bookmark/handler/ChangeBookmarkHandler.ts");
 /* harmony import */ var _service_BookmarkApi__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./service/BookmarkApi */ "./src/background/bookmark/service/BookmarkApi.ts");
+/* harmony import */ var _handler_MoveBookmarkHandler__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./handler/MoveBookmarkHandler */ "./src/background/bookmark/handler/MoveBookmarkHandler.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -16965,6 +16964,7 @@ var __generator = (undefined && undefined.__generator) || function (thisArg, bod
 
 
 
+
 var BookmarkApplication = /** @class */ (function () {
     function BookmarkApplication() {
     }
@@ -16972,9 +16972,12 @@ var BookmarkApplication = /** @class */ (function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.init()];
+                    case 0:
+                        console.debug('BookmarkApplication run');
+                        return [4 /*yield*/, this.init()];
                     case 1:
                         _a.sent();
+                        console.debug('BookmarkApplication run inited');
                         return [2 /*return*/];
                 }
             });
@@ -16986,20 +16989,139 @@ var BookmarkApplication = /** @class */ (function () {
             return __generator(this, function (_c) {
                 switch (_c.label) {
                     case 0:
+                        console.debug('BookmarkApplication init');
                         _b = (_a = _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"]).saveAll;
                         return [4 /*yield*/, _service_BookmarkApi__WEBPACK_IMPORTED_MODULE_4__["default"].getAll()];
                     case 1: return [4 /*yield*/, _b.apply(_a, [_c.sent()])];
                     case 2:
                         _c.sent();
-                        new _handler_CreateBookmarkHandler__WEBPACK_IMPORTED_MODULE_1__.CreateBookmarkHandler().start();
-                        new _handler_DeleteBookmarkHandler__WEBPACK_IMPORTED_MODULE_2__.DeleteBookmarkHandler().start();
-                        new _handler_UpdateBookmarkHandler__WEBPACK_IMPORTED_MODULE_3__.UpdateBookmarkHandler().start();
+                        return [4 /*yield*/, _handler_CreateBookmarkHandler__WEBPACK_IMPORTED_MODULE_1__.CreateBookmarkHandler.build()];
+                    case 3:
+                        (_c.sent()).start();
+                        return [4 /*yield*/, _handler_ChangeBookmarkHandler__WEBPACK_IMPORTED_MODULE_3__.ChangeBookmarkHandler.build()];
+                    case 4:
+                        (_c.sent()).start();
+                        return [4 /*yield*/, _handler_MoveBookmarkHandler__WEBPACK_IMPORTED_MODULE_5__.MoveBookmarkHandler.build()];
+                    case 5:
+                        (_c.sent()).start();
+                        return [4 /*yield*/, _handler_RemoveBookmarkHandler__WEBPACK_IMPORTED_MODULE_2__.RemoveBookmarkHandler.build()];
+                    case 6:
+                        (_c.sent()).start();
                         return [2 /*return*/];
                 }
             });
         });
     };
     return BookmarkApplication;
+}());
+
+
+
+/***/ }),
+
+/***/ "./src/background/bookmark/handler/ChangeBookmarkHandler.ts":
+/*!******************************************************************!*\
+  !*** ./src/background/bookmark/handler/ChangeBookmarkHandler.ts ***!
+  \******************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ChangeBookmarkHandler": () => (/* binding */ ChangeBookmarkHandler)
+/* harmony export */ });
+/* harmony import */ var _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../repository/BookmarkDao */ "./src/background/bookmark/repository/BookmarkDao.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (undefined && undefined.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
+
+var ChangeBookmarkHandler = /** @class */ (function () {
+    function ChangeBookmarkHandler(handle) {
+        if (handle === void 0) { handle = null; }
+        this.handle = handle;
+    }
+    ChangeBookmarkHandler.build = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var updateBookmarkHandler;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        updateBookmarkHandler = new ChangeBookmarkHandler();
+                        return [4 /*yield*/, updateBookmarkHandler.init()];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/, updateBookmarkHandler];
+                }
+            });
+        });
+    };
+    ChangeBookmarkHandler.prototype.init = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.handle = function (id, bookmarkInfo) { return __awaiter(_this, void 0, void 0, function () {
+                    var bookmark;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                console.debug('ChangeBookmarkHandler handle', bookmarkInfo);
+                                return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].findById(id)];
+                            case 1:
+                                bookmark = _a.sent();
+                                bookmark.title = bookmarkInfo.title;
+                                bookmark.url = bookmarkInfo.url;
+                                return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].save(bookmark)];
+                            case 2:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
+                return [2 /*return*/];
+            });
+        });
+    };
+    ChangeBookmarkHandler.prototype.start = function () {
+        console.debug('ChangeBookmarkHandler start');
+        browser.bookmarks.onChanged.addListener(this.handle);
+    };
+    ChangeBookmarkHandler.prototype.stop = function () {
+        browser.bookmarks.onChanged.removeListener(this.handle);
+    };
+    return ChangeBookmarkHandler;
 }());
 
 
@@ -17017,16 +17139,90 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "CreateBookmarkHandler": () => (/* binding */ CreateBookmarkHandler)
 /* harmony export */ });
-var CreateBookmarkHandler = /** @class */ (function () {
-    function CreateBookmarkHandler() {
+/* harmony import */ var _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../repository/BookmarkDao */ "./src/background/bookmark/repository/BookmarkDao.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (undefined && undefined.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
+};
+
+var CreateBookmarkHandler = /** @class */ (function () {
+    function CreateBookmarkHandler(handle) {
+        if (handle === void 0) { handle = null; }
+        this.handle = handle;
+    }
+    CreateBookmarkHandler.build = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var createBookmarkHandler;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        createBookmarkHandler = new CreateBookmarkHandler();
+                        return [4 /*yield*/, createBookmarkHandler.init()];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/, createBookmarkHandler];
+                }
+            });
+        });
+    };
+    CreateBookmarkHandler.prototype.init = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.handle = function (id, bookmark) { return __awaiter(_this, void 0, void 0, function () {
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                console.debug('CreateBookmarkHandler handle', bookmark);
+                                return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].save(bookmark)];
+                            case 1:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
+                return [2 /*return*/];
+            });
+        });
+    };
     CreateBookmarkHandler.prototype.start = function () {
+        console.debug('CreateBookmarkHandler start');
         browser.bookmarks.onCreated.addListener(this.handle);
     };
     CreateBookmarkHandler.prototype.stop = function () {
         browser.bookmarks.onCreated.removeListener(this.handle);
-    };
-    CreateBookmarkHandler.prototype.handle = function () {
     };
     return CreateBookmarkHandler;
 }());
@@ -17035,54 +17231,212 @@ var CreateBookmarkHandler = /** @class */ (function () {
 
 /***/ }),
 
-/***/ "./src/background/bookmark/handler/DeleteBookmarkHandler.ts":
-/*!******************************************************************!*\
-  !*** ./src/background/bookmark/handler/DeleteBookmarkHandler.ts ***!
-  \******************************************************************/
+/***/ "./src/background/bookmark/handler/MoveBookmarkHandler.ts":
+/*!****************************************************************!*\
+  !*** ./src/background/bookmark/handler/MoveBookmarkHandler.ts ***!
+  \****************************************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "DeleteBookmarkHandler": () => (/* binding */ DeleteBookmarkHandler)
+/* harmony export */   "MoveBookmarkHandler": () => (/* binding */ MoveBookmarkHandler)
 /* harmony export */ });
-var DeleteBookmarkHandler = /** @class */ (function () {
-    function DeleteBookmarkHandler() {
+/* harmony import */ var _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../repository/BookmarkDao */ "./src/background/bookmark/repository/BookmarkDao.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (undefined && undefined.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
-    DeleteBookmarkHandler.prototype.handle = function () {
+};
+
+var MoveBookmarkHandler = /** @class */ (function () {
+    function MoveBookmarkHandler(handle) {
+        if (handle === void 0) { handle = null; }
+        this.handle = handle;
+    }
+    MoveBookmarkHandler.build = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var moveBookmarkHandler;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        moveBookmarkHandler = new MoveBookmarkHandler();
+                        return [4 /*yield*/, moveBookmarkHandler.init()];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/, moveBookmarkHandler];
+                }
+            });
+        });
     };
-    DeleteBookmarkHandler.prototype.start = function () {
+    MoveBookmarkHandler.prototype.init = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.handle = function (id, bookmarkInfo) { return __awaiter(_this, void 0, void 0, function () {
+                    var bookmark;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                console.debug('MoveBookmarkHandler handle', bookmarkInfo);
+                                return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].findById(id)];
+                            case 1:
+                                bookmark = _a.sent();
+                                bookmark.parentId = bookmarkInfo.parentId;
+                                bookmark.index = bookmarkInfo.index;
+                                return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].save(bookmark)];
+                            case 2:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
+                return [2 /*return*/];
+            });
+        });
     };
-    DeleteBookmarkHandler.prototype.stop = function () {
+    MoveBookmarkHandler.prototype.start = function () {
+        console.debug('MoveBookmarkHandler start');
+        browser.bookmarks.onMoved.addListener(this.handle);
     };
-    return DeleteBookmarkHandler;
+    MoveBookmarkHandler.prototype.stop = function () {
+        browser.bookmarks.onMoved.removeListener(this.handle);
+    };
+    return MoveBookmarkHandler;
 }());
 
 
 
 /***/ }),
 
-/***/ "./src/background/bookmark/handler/UpdateBookmarkHandler.ts":
+/***/ "./src/background/bookmark/handler/RemoveBookmarkHandler.ts":
 /*!******************************************************************!*\
-  !*** ./src/background/bookmark/handler/UpdateBookmarkHandler.ts ***!
+  !*** ./src/background/bookmark/handler/RemoveBookmarkHandler.ts ***!
   \******************************************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "UpdateBookmarkHandler": () => (/* binding */ UpdateBookmarkHandler)
+/* harmony export */   "RemoveBookmarkHandler": () => (/* binding */ RemoveBookmarkHandler)
 /* harmony export */ });
-var UpdateBookmarkHandler = /** @class */ (function () {
-    function UpdateBookmarkHandler() {
+/* harmony import */ var _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../repository/BookmarkDao */ "./src/background/bookmark/repository/BookmarkDao.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (undefined && undefined.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
-    UpdateBookmarkHandler.prototype.handle = function () {
+};
+
+var RemoveBookmarkHandler = /** @class */ (function () {
+    function RemoveBookmarkHandler(handle) {
+        if (handle === void 0) { handle = null; }
+        this.handle = handle;
+    }
+    RemoveBookmarkHandler.build = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var deleteBookmarkHandler;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        deleteBookmarkHandler = new RemoveBookmarkHandler();
+                        return [4 /*yield*/, deleteBookmarkHandler.init()];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/, deleteBookmarkHandler];
+                }
+            });
+        });
     };
-    UpdateBookmarkHandler.prototype.start = function () {
+    RemoveBookmarkHandler.prototype.init = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.handle = function (id, removeInfo) { return __awaiter(_this, void 0, void 0, function () {
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                console.debug('RemoveBookmarkHandler handle', removeInfo);
+                                return [4 /*yield*/, _repository_BookmarkDao__WEBPACK_IMPORTED_MODULE_0__["default"].findAllChildrenByParentId(id)];
+                            case 1:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); };
+                return [2 /*return*/];
+            });
+        });
     };
-    UpdateBookmarkHandler.prototype.stop = function () {
+    RemoveBookmarkHandler.prototype.start = function () {
+        console.debug('RemoveBookmarkHandler start');
+        browser.bookmarks.onRemoved.addListener(this.handle);
     };
-    return UpdateBookmarkHandler;
+    RemoveBookmarkHandler.prototype.stop = function () {
+        browser.bookmarks.onRemoved.removeListener(this.handle);
+    };
+    return RemoveBookmarkHandler;
 }());
 
 
@@ -17276,6 +17630,16 @@ var BookmarkDao = /** @class */ (function () {
             });
         });
     };
+    BookmarkDao.prototype.findAllChildrenByParentId = function (id) {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.find(new _model_BookmarkQuery__WEBPACK_IMPORTED_MODULE_0__.BookmarkQuery(undefined, id))];
+                    case 1: return [2 /*return*/, _a.sent()];
+                }
+            });
+        });
+    };
     BookmarkDao.prototype.delete = function (query) {
         return __awaiter(this, void 0, void 0, function () {
             var _a, _b;
@@ -17336,18 +17700,17 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony import */ var pouchdb__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb */ "./node_modules/pouchdb/lib/index-browser.es.js");
-/* harmony import */ var pouchdb_find__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! pouchdb-find */ "./node_modules/pouchdb-find/lib/index-browser.es.js");
+/* harmony import */ var pouchdb_find__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-find */ "./node_modules/pouchdb-find/lib/index-browser.es.js");
+var PouchDB = (__webpack_require__(/*! pouchdb-browser */ "./node_modules/pouchdb-browser/lib/index.es.js")["default"]);
 
-
-pouchdb__WEBPACK_IMPORTED_MODULE_0__.plugin(pouchdb_find__WEBPACK_IMPORTED_MODULE_1__["default"]);
+PouchDB.plugin(pouchdb_find__WEBPACK_IMPORTED_MODULE_0__["default"]);
 var BookmarkDataSource = /** @class */ (function () {
     function BookmarkDataSource() {
         this.db = null;
     }
     BookmarkDataSource.build = function () {
         var bookmarkDataSource = new BookmarkDataSource();
-        bookmarkDataSource.db = new pouchdb__WEBPACK_IMPORTED_MODULE_0__('bookmark');
+        bookmarkDataSource.db = new PouchDB('bookmark');
         return bookmarkDataSource;
     };
     return BookmarkDataSource;
@@ -18592,9 +18955,14 @@ var Main = /** @class */ (function () {
     Main.prototype.run = function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
-                console.log('run');
-                new _background_bookmark_BookmarkApplication__WEBPACK_IMPORTED_MODULE_0__.BookmarkApplication().run();
-                return [2 /*return*/];
+                switch (_a.label) {
+                    case 0:
+                        console.debug('Main run');
+                        return [4 /*yield*/, new _background_bookmark_BookmarkApplication__WEBPACK_IMPORTED_MODULE_0__.BookmarkApplication().run()];
+                    case 1:
+                        _a.sent();
+                        return [2 /*return*/];
+                }
             });
         });
     };

@@ -18,6 +18,8 @@ export class MoveBookmarkHandler implements Handler {
 
     public async init(): Promise<void> {
         this.handle = async (id: string, bookmarkInfo: BookmarkMoveInfo) => {
+            console.debug('MoveBookmarkHandler handle', bookmarkInfo);
+
             const bookmark: Bookmark = await bookmarkDao.findById(id);
 
             bookmark.parentId = bookmarkInfo.parentId;
@@ -28,11 +30,12 @@ export class MoveBookmarkHandler implements Handler {
     }
 
     public start(): void {
-        browser.bookmarks.onChanged.addListener(this.handle);
+        console.debug('MoveBookmarkHandler start');
+        browser.bookmarks.onMoved.addListener(this.handle);
     }
 
     public stop(): void {
-        browser.bookmarks.onChanged.removeListener(this.handle);
+        browser.bookmarks.onMoved.removeListener(this.handle);
     }
 
 }
