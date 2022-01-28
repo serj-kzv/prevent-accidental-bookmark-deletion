@@ -1,15 +1,11 @@
 import {BookmarkQuery} from "./BookmarkQuery";
 import {BookmarkValidatorUtils} from "./BookmarkValidatorUtils";
 import {Bookmark} from "./Bookmark";
-import * as PouchDB from 'pouchdb';
-import * as PouchDBFind from 'pouchdb-find';
-
-PouchDB.plugin(PouchDBFind);
+import bookmarkDataSource from "./BookmarkDataSource";
 
 export class BookmarkDao {
 
     constructor(
-        public db = new PouchDB<Bookmark>('bookmark')
     ) {
     }
 
@@ -22,7 +18,7 @@ export class BookmarkDao {
             throw new Error('Already exists');
         }
 
-        await this.db.put<Bookmark>(bookmark);
+        await bookmarkDataSource.db.put<Bookmark>(bookmark);
 
         return bookmark;
     }
@@ -49,7 +45,7 @@ export class BookmarkDao {
     }
 
     async find(query: BookmarkQuery): Promise<Bookmark[]> {
-        return (await this.db.find({selector: query})).docs;
+        return (await bookmarkDataSource.db.find({selector: query})).docs;
     }
 
     async findOne(query: BookmarkQuery): Promise<Bookmark | null> {
@@ -66,16 +62,20 @@ export class BookmarkDao {
     }
 
     async findById(id: string): Promise<Bookmark | null> {
+        BookmarkValidatorUtils.validateBookmarkId(id);
+
         return this.findOne(new BookmarkQuery(id));
     }
 
-    async delete(query: BookmarkQuery, bookmark: Bookmark): Promise<void> {
+    async delete(query: BookmarkQuery): Promise<void> {
         await Promise.allSettled((await this.find(query))
-            .map(async bookmark => await this.db.remove(await this.db.get(bookmark.id))));
+            .map(async bookmark => await bookmarkDataSource.db.remove(await bookmarkDataSource.db.get(bookmark.id))));
     }
 
-    async deleteById(id: string, bookmark: Bookmark): Promise<void> {
-        await this.delete(new BookmarkQuery(id), bookmark);
+    async deleteById(id: string): Promise<void> {
+        BookmarkValidatorUtils.validateBookmarkId(id);
+
+        await this.delete(new BookmarkQuery(id));
     }
 
 }
