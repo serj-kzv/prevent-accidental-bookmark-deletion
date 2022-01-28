@@ -92,6 +92,11 @@ class BookmarkDao {
         await this.delete(new BookmarkQuery(id));
     }
 
+    async deleteAll(): Promise<void> {
+        await Promise.allSettled((await bookmarkDataSource.db.allDocs()).rows
+            .map(async ({id}) => await this.deleteById(id)));
+    }
+
 }
 
 const bookmarkDao: BookmarkDao = new BookmarkDao();

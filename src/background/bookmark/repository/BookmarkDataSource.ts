@@ -1,6 +1,8 @@
-const PouchDB = require('pouchdb-browser').default;
+import {Constants} from "../utils/Constants";
 import {Bookmark} from "../model/Bookmark";
 import PouchDBFind from "pouchdb-find";
+
+const PouchDB = require('pouchdb-browser').default;
 
 PouchDB.plugin(PouchDBFind);
 
@@ -13,7 +15,7 @@ class BookmarkDataSource {
     public static build(): BookmarkDataSource {
         const bookmarkDataSource: BookmarkDataSource = new BookmarkDataSource();
 
-        bookmarkDataSource.db = new PouchDB('bookmark');
+        bookmarkDataSource.db = new PouchDB(Constants.BOOKMARK_DATABASE_NAME);
 
         return bookmarkDataSource;
     }
