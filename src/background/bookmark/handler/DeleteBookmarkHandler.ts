@@ -2,7 +2,7 @@ import {Handler} from "./Handler";
 
 export class DeleteBookmarkHandler implements Handler {
 
-    handle(): void {
+    init(): void {
     }
 
     start(): void {
