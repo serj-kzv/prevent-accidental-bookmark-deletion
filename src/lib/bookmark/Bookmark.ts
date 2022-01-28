@@ -5,12 +5,13 @@ import {Identifiable} from "../Identifiable";
 export class Bookmark implements Equals, Identifiable {
 
     public constructor(
-        public id: string,
+        public _id: string,
         public parentId: string,
         public title: string,
         public type: BookmarkType,
         public url: string,
         public index: number,
+        public bookmarks: Bookmark[] = []
     ) {
     }
 
@@ -21,7 +22,7 @@ export class Bookmark implements Equals, Identifiable {
 
         const bookmark: Bookmark = (object as Bookmark);
 
-        return this.id === bookmark.id
+        return this._id === bookmark._id
             && this.parentId === bookmark.parentId
             && this.title === bookmark.title
             && this.type.valueOf() === bookmark.type.valueOf()
@@ -30,6 +31,6 @@ export class Bookmark implements Equals, Identifiable {
     }
 
     public getId(): string {
-        return this.id;
+        return this._id;
     }
 }

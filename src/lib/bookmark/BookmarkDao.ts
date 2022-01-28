@@ -1,11 +1,20 @@
 import {BookmarkQuery} from "./BookmarkQuery";
 import {Bookmark} from "./Bookmark";
-import * as lf from 'lf';
+import * as PouchDB from 'pouchdb';
+import * as PouchDBFind from 'pouchdb-find';
+
+PouchDB.plugin(PouchDBFind);
 
 export class BookmarkDao {
 
-    findOne(query: BookmarkQuery): Bookmark {
-        const count: number = this.count(query);
+    constructor(
+        public db = new PouchDB('kittens')
+    ) {
+    }
+
+    async findOne(query: BookmarkQuery): Promise<any> {
+        const bookmarks: Bookmark[] = await this.find(query);
+        const count: number = bookmarks.length;
 
         if (count < 1) {
             return null;
@@ -13,23 +22,27 @@ export class BookmarkDao {
             throw new Error('Multi values');
         }
 
-        return this.find(query)[0];
+        return (await this.find(query))[0];
     }
 
-    find(query: BookmarkQuery): Bookmark[] {
-
+    async find(query: BookmarkQuery): Promise<any> {
+        return await this.db.find({
+            selector: query
+        });
     }
 
-    findById(id: string): Bookmark {
-        return this.findOne(new BookmarkQuery(id));
+    async findById(id: string): Promise<any> {
+        return await this.findOne(new BookmarkQuery(id));
     }
 
-    create(bookmark: Bookmark): Bookmark {
-        const count: number = this.countById(bookmark.id);
+    async create(bookmark: Bookmark): Promise<any> {
+        const bookmarks: Bookmark[] = await this.findById(bookmark.getId());
 
-        if (count > 1) {
+        if (bookmarks.length > 1) {
             throw new Error('Already exists');
         }
+
+        return await this.db.put<Bookmark>(bookmark);
     }
 
     addChild(query: BookmarkQuery, bookmark: Bookmark) {
@@ -56,14 +69,6 @@ export class BookmarkDao {
 
     removeChildById(id: string, bookmark: Bookmark) {
         return this.removeChild(new BookmarkQuery(id), bookmark);
-    }
-
-    count(query: BookmarkQuery): number {
-
-    }
-
-    countById(id: string): number {
-        return this.count(new BookmarkQuery(id));
     }
 
 }
