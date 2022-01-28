@@ -100,6 +100,8 @@ class BookmarkDao {
     }
 
     async deleteAll(): Promise<void> {
+        console.debug('BookmarkDao deleteAll');
+
         await Promise.allSettled((await bookmarkDataSource.db.allDocs()).rows
             .map(async ({id}) => await this.deleteById(id)));
     }

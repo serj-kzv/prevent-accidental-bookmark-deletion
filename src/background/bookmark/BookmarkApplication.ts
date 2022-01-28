@@ -10,11 +10,9 @@ export class BookmarkApplication {
 
     public async run(): Promise<void> {
         console.debug('BookmarkApplication run');
+        console.debug('BookmarkApplication allDocs before', await bookmarkDao.findAll());
         console.debug('BookmarkApplication run deleteAll for development purposes', await bookmarkDao.deleteAll());
-        console.debug('BookmarkApplication allDocs', await bookmarkDataSource.db.allDocs({
-            include_docs: true,
-            attachments: true
-        }));
+        console.debug('BookmarkApplication allDocs after', await bookmarkDao.findAll());
         await this.init();
         console.debug('BookmarkApplication run inited');
     }
