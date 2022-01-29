@@ -53,7 +53,11 @@ class BookmarkDao {
     async find(query: BookmarkQuery): Promise<Bookmark[]> {
         console.debug('BookmarkDao find', query);
 
-        return (await bookmarkDataSource.db.find({selector: query})).docs;
+        const docs = (await bookmarkDataSource.db.find({selector: query})).docs;
+
+        console.debug('BookmarkDao find found', query, docs);
+
+        return docs;
     }
 
     async findOne(query: BookmarkQuery): Promise<Bookmark | null> {
@@ -87,10 +91,16 @@ class BookmarkDao {
     }
 
     async delete(query: BookmarkQuery): Promise<void> {
-        console.debug('BookmarkDao delete', query);
+        console.debug('BookmarkDao delete', query, await this.find(query));
 
         await Promise.allSettled((await this.find(query))
-            .map(async bookmark => await bookmarkDataSource.db.remove(await bookmarkDataSource.db.get(bookmark.id))));
+            .map(async bookmark => {
+                const doc = await bookmarkDataSource.db.get(bookmark.id);
+
+                console.debug('BookmarkDao delete doc', doc);
+
+                await bookmarkDataSource.db.remove(doc);
+            }));
     }
 
     async deleteById(id: string): Promise<void> {
@@ -100,7 +110,7 @@ class BookmarkDao {
     }
 
     async deleteAll(): Promise<void> {
-        console.debug('BookmarkDao deleteAll');
+        console.debug('BookmarkDao deleteAll', (await bookmarkDataSource.db.allDocs()).rows);
 
         await Promise.allSettled((await bookmarkDataSource.db.allDocs()).rows
             .map(async ({id}) => await this.deleteById(id)));
