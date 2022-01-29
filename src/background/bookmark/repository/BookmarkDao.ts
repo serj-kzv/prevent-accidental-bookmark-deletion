@@ -53,6 +53,7 @@ class BookmarkDao {
     async find(query: BookmarkQuery): Promise<Bookmark[]> {
         console.debug('BookmarkDao find', query);
 
+        // TODO: find does not work
         const docs = (await bookmarkDataSource.db.find({selector: query})).docs;
 
         console.debug('BookmarkDao find found', query, docs);
