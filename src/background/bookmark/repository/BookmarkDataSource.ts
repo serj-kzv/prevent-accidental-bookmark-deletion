@@ -6,7 +6,7 @@ const PouchDB = require('pouchdb-browser').default;
 
 PouchDB.plugin(PouchDBFind);
 
-class BookmarkDataSource {
+export default class BookmarkDataSource {
     public db: PouchDB.Database<Bookmark> = null;
 
     private constructor() {
@@ -20,7 +20,3 @@ class BookmarkDataSource {
         return bookmarkDataSource;
     }
 }
-
-const bookmarkDataSource: BookmarkDataSource = BookmarkDataSource.build();
-
-export default bookmarkDataSource;

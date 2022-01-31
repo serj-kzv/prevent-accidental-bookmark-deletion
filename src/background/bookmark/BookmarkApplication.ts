@@ -1,10 +1,8 @@
-import bookmarkDao from "./repository/BookmarkDao";
 import {CreateBookmarkHandler} from "./handler/CreateBookmarkHandler";
 import {RemoveBookmarkHandler} from "./handler/RemoveBookmarkHandler";
 import {ChangeBookmarkHandler} from "./handler/ChangeBookmarkHandler";
-import bookmarkApi from "./service/BookmarkApi";
 import {MoveBookmarkHandler} from "./handler/MoveBookmarkHandler";
-import bookmarkDataSource from "./repository/BookmarkDataSource";
+import {bookmarkApi, bookmarkDao} from "./BookmarkApplicationContext";
 
 export class BookmarkApplication {
 

@@ -1,11 +1,11 @@
 import {BookmarkQuery} from "../model/BookmarkQuery";
 import {BookmarkValidatorUtils} from "../utils/BookmarkValidatorUtils";
 import {Bookmark} from "../model/Bookmark";
-import bookmarkDataSource from "./BookmarkDataSource";
+import {bookmarkDataSource} from "../BookmarkApplicationContext";
 
-class BookmarkDao {
+export default class BookmarkDao {
 
-    async save(bookmark: Bookmark): Promise<Bookmark> {
+    public async save(bookmark: Bookmark): Promise<Bookmark> {
         console.debug('BookmarkDao save', bookmark);
 
         BookmarkValidatorUtils.validateHasId(bookmark);
@@ -21,7 +21,7 @@ class BookmarkDao {
         return bookmark;
     }
 
-    async saveChildByParentQuery(query: BookmarkQuery, bookmark: Bookmark): Promise<Bookmark> {
+    public async saveChildByParentQuery(query: BookmarkQuery, bookmark: Bookmark): Promise<Bookmark> {
         BookmarkValidatorUtils.validateHasNoId(bookmark)
         BookmarkValidatorUtils.validateNotEmptyQuery(query);
 
@@ -36,13 +36,13 @@ class BookmarkDao {
         throw Error('Has no such parent with query');
     }
 
-    async saveChildByParentId(id: string, bookmark: Bookmark): Promise<Bookmark | null> {
+    public async saveChildByParentId(id: string, bookmark: Bookmark): Promise<Bookmark | null> {
         BookmarkValidatorUtils.validateBookmarkId(id);
 
         return this.saveChildByParentQuery(new BookmarkQuery(id), bookmark);
     }
 
-    async saveAll(bookmarks: Bookmark[]): Promise<Bookmark[]> {
+    public async saveAll(bookmarks: Bookmark[]): Promise<Bookmark[]> {
         BookmarkValidatorUtils.validateHasIdAll(bookmarks);
 
         await bookmarkDataSource.db.bulkDocs(bookmarks);
@@ -50,7 +50,7 @@ class BookmarkDao {
         return bookmarks;
     }
 
-    async find(query: BookmarkQuery): Promise<Bookmark[]> {
+    public async find(query: BookmarkQuery): Promise<Bookmark[]> {
         console.debug('BookmarkDao find', query);
 
         // TODO: find does not work
@@ -61,7 +61,7 @@ class BookmarkDao {
         return docs;
     }
 
-    async findOne(query: BookmarkQuery): Promise<Bookmark | null> {
+    public async findOne(query: BookmarkQuery): Promise<Bookmark | null> {
         const bookmarks: Bookmark[] = await this.find(query);
         const count: number = bookmarks.length;
 
@@ -74,24 +74,24 @@ class BookmarkDao {
         return bookmarks[0];
     }
 
-    async findById(id: string): Promise<Bookmark | null> {
+    public async findById(id: string): Promise<Bookmark | null> {
         BookmarkValidatorUtils.validateBookmarkId(id);
 
         return this.findOne(new BookmarkQuery(id));
     }
 
-    async findAll(): Promise<Bookmark[]> {
+    public async findAll(): Promise<Bookmark[]> {
         console.debug('BookmarkDao findAll');
         const rows = (await bookmarkDataSource.db.allDocs({include_docs: true})).rows;
 
         return rows.map(row => row.doc as Bookmark);
     }
 
-    async findAllChildrenByParentId(id: string): Promise<Bookmark[]> {
+    public async findAllChildrenByParentId(id: string): Promise<Bookmark[]> {
         return await this.find(new BookmarkQuery(undefined, id));
     }
 
-    async delete(query: BookmarkQuery): Promise<void> {
+    public async delete(query: BookmarkQuery): Promise<void> {
         console.debug('BookmarkDao delete', query, await this.find(query));
 
         await Promise.allSettled((await this.find(query))
@@ -104,13 +104,13 @@ class BookmarkDao {
             }));
     }
 
-    async deleteById(id: string): Promise<void> {
+    public async deleteById(id: string): Promise<void> {
         BookmarkValidatorUtils.validateBookmarkId(id);
 
         await this.delete(new BookmarkQuery(id));
     }
 
-    async deleteAll(): Promise<void> {
+    public async deleteAll(): Promise<void> {
         console.debug('BookmarkDao deleteAll', (await bookmarkDataSource.db.allDocs()).rows);
 
         await Promise.allSettled((await bookmarkDataSource.db.allDocs()).rows
@@ -118,7 +118,3 @@ class BookmarkDao {
     }
 
 }
-
-const bookmarkDao: BookmarkDao = new BookmarkDao();
-
-export default bookmarkDao;
