@@ -18,3 +18,6 @@ See https://bugzilla.mozilla.org/show_bug.cgi?id=1315009
    1. Delete transaction from transaction log
 5. On browser start check if bookmarks were modified, check it by id
    1. If a bookmark was modified show a page with suggestion to restore all of them (means from root bookmarks)
+6. All restore operation placed to a queue and if one of them does not have parentId it will be move to end of the queue and delayed with a timeout
+   1. If timeout is out then show a page with suggestion to restore all bookmarks
+   2. We need it because we do not know if bookmark listeners run in order of bookmark operations

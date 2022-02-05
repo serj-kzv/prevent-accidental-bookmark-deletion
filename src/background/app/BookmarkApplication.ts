@@ -2,7 +2,8 @@ import {CreateBookmarkHandler} from "./bookmark/handler/CreateBookmarkHandler";
 import {RemoveBookmarkHandler} from "./bookmark/handler/RemoveBookmarkHandler";
 import {ChangeBookmarkHandler} from "./bookmark/handler/ChangeBookmarkHandler";
 import {MoveBookmarkHandler} from "./bookmark/handler/MoveBookmarkHandler";
-import {bookmarkApi, bookmarkDao} from "./BookmarkApplicationContext";
+import {bookmarkApiService, bookmarkDao} from "./BookmarkApplicationContext";
+import StartupBrowserHandler from "./browser/handler/StartupBrowserHandler";
 
 export class BookmarkApplication {
 
@@ -17,7 +18,8 @@ export class BookmarkApplication {
 
     private async init(): Promise<void> {
         console.debug('BookmarkApplication init');
-        await bookmarkDao.saveAll(await bookmarkApi.getAll());
+        await bookmarkDao.saveAll(await bookmarkApiService.getAll());
+        (await StartupBrowserHandler.build()).start();
         (await CreateBookmarkHandler.build()).start();
         (await ChangeBookmarkHandler.build()).start();
         (await MoveBookmarkHandler.build()).start();

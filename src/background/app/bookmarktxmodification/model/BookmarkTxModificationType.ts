@@ -1,3 +1,3 @@
 export enum BookmarkTxModificationType {
-    DELETE,
+    REMOVE,
 }

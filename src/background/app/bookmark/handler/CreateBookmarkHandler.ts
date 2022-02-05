@@ -1,6 +1,6 @@
 import {Handler} from "../../base/handler/Handler";
 import {Bookmark} from "../model/Bookmark";
-import {bookmarkDao} from "../../BookmarkApplicationContext";
+import {bookmarkHandlerService} from "../../BookmarkApplicationContext";
 
 export class CreateBookmarkHandler implements Handler {
 
@@ -19,7 +19,7 @@ export class CreateBookmarkHandler implements Handler {
         this.handle = async (id: string, bookmark: Bookmark) => {
             console.debug('CreateBookmarkHandler handle', bookmark);
 
-            await bookmarkDao.save(bookmark);
+            await bookmarkHandlerService.create(id, bookmark);
         }
     }
 

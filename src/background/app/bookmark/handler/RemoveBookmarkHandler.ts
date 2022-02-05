@@ -1,6 +1,6 @@
 import {Handler} from "../../base/handler/Handler";
 import BookmarkRemoveInfo from "../model/BookmarkRemoveInfo";
-import {bookmarkDao} from "../../BookmarkApplicationContext";
+import {bookmarkHandlerService} from "../../BookmarkApplicationContext";
 
 export class RemoveBookmarkHandler implements Handler {
 
@@ -16,10 +16,10 @@ export class RemoveBookmarkHandler implements Handler {
     }
 
     public async init(): Promise<void> {
-        this.handle = async (id: string, removeInfo: BookmarkRemoveInfo) => {
-            console.debug('RemoveBookmarkHandler handle', removeInfo);
+        this.handle = async (id: string, bookmarkRemoveInfo: BookmarkRemoveInfo) => {
+            console.debug('RemoveBookmarkHandler handle', bookmarkRemoveInfo);
 
-            await bookmarkDao.findAllChildrenByParentId(id);
+            await bookmarkHandlerService.restoreOnRemove(id, bookmarkRemoveInfo);
         }
     }
 
