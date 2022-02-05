@@ -8,7 +8,7 @@ export default class BookmarkTxModification extends IdentifiableObject {
         public bookmark: Bookmark,
         public bookmarkTxModificationType: BookmarkTxModificationType
     ) {
-        super(bookmark.id);
+        super(bookmark.getId());
     }
 
 }

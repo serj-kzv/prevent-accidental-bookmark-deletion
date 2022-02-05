@@ -2,7 +2,7 @@ import {Identifiable} from "./Identifiable";
 
 export default class IdentifiableObject implements Identifiable {
 
-    constructor(private id?: string) {
+    constructor(protected id?: string) {
     }
 
     getId(): string {

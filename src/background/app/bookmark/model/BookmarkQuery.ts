@@ -4,7 +4,7 @@ import IdentifiableObject from "../../base/model/IdentifiableObject";
 export class BookmarkQuery extends IdentifiableObject {
 
     public constructor(
-        public id?: string,
+        id?: string,
         public parentId?: string,
         public title?: string,
         public type?: BookmarkType,
