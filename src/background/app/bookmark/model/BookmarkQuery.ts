@@ -1,7 +1,7 @@
 import {BookmarkType} from "./BookmarkType";
-import {Identifiable} from "../../base/model/Identifiable";
+import IdentifiableObject from "../../base/model/IdentifiableObject";
 
-export class BookmarkQuery implements Identifiable {
+export class BookmarkQuery extends IdentifiableObject {
 
     public constructor(
         public id?: string,
@@ -11,10 +11,7 @@ export class BookmarkQuery implements Identifiable {
         public url?: string,
         public index?: number,
     ) {
-    }
-
-    getId(): string {
-        return this.id;
+        super(id);
     }
 
 }

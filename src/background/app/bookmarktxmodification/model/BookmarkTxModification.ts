@@ -1,18 +1,15 @@
 import {Bookmark} from "../../bookmark/model/Bookmark";
 import {BookmarkTxModificationType} from "./BookmarkTxModificationType";
-import {Identifiable} from "../../base/model/Identifiable";
+import IdentifiableObject from "../../base/model/IdentifiableObject";
 
-export default class BookmarkTxModification implements Identifiable {
+export default class BookmarkTxModification extends IdentifiableObject {
     public id: string;
 
     constructor(
         public bookmark: Bookmark,
         public bookmarkTxModificationType: BookmarkTxModificationType
     ) {
-        this.id = bookmark.id;
+        super(bookmark.id);
     }
 
-    getId(): string {
-        return this.id;
-    }
 }

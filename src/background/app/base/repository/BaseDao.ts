@@ -1,10 +1,13 @@
 import {default as PouchDB} from "pouchdb-browser";
 import {Identifiable} from "../model/Identifiable";
 import IdentifiableValidatorUtils from "../../utils/IdentifiableValidatorUtils";
+import IdentifiableObject from "../model/IdentifiableObject";
 
 export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
 
-    protected constructor(public db: PouchDB.Database<T> = null, public dbQueryType: any) {
+    private dbQueryType: any = IdentifiableObject;
+
+    protected constructor(public db: PouchDB.Database<T> = null) {
     }
 
     public async save(payload: T): Promise<T> {
