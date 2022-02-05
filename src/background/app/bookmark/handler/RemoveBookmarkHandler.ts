@@ -1,6 +1,6 @@
-import {Handler} from "./base/Handler";
-import bookmarkDao from "../repository/BookmarkDao";
+import {Handler} from "../../base/handler/Handler";
 import BookmarkRemoveInfo from "../model/BookmarkRemoveInfo";
+import {bookmarkDao} from "../../BookmarkApplicationContext";
 
 export class RemoveBookmarkHandler implements Handler {
 

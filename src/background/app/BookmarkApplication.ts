@@ -1,7 +1,7 @@
-import {CreateBookmarkHandler} from "./handler/CreateBookmarkHandler";
-import {RemoveBookmarkHandler} from "./handler/RemoveBookmarkHandler";
-import {ChangeBookmarkHandler} from "./handler/ChangeBookmarkHandler";
-import {MoveBookmarkHandler} from "./handler/MoveBookmarkHandler";
+import {CreateBookmarkHandler} from "./bookmark/handler/CreateBookmarkHandler";
+import {RemoveBookmarkHandler} from "./bookmark/handler/RemoveBookmarkHandler";
+import {ChangeBookmarkHandler} from "./bookmark/handler/ChangeBookmarkHandler";
+import {MoveBookmarkHandler} from "./bookmark/handler/MoveBookmarkHandler";
 import {bookmarkApi, bookmarkDao} from "./BookmarkApplicationContext";
 
 export class BookmarkApplication {

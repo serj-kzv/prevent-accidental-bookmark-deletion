@@ -1,4 +1,4 @@
-import {BookmarkApplication} from "./background/bookmark/BookmarkApplication";
+import {BookmarkApplication} from "./background/app/BookmarkApplication";
 
 class Main {
     public async run() {

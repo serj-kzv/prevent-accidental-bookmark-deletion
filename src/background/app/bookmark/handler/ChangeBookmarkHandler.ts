@@ -1,7 +1,7 @@
-import {Handler} from "./base/Handler";
+import {Handler} from "../../base/handler/Handler";
 import {Bookmark} from "../model/Bookmark";
-import bookmarkDao from "../repository/BookmarkDao";
 import BookmarkChangeInfo from "../model/BookmarkChangeInfo";
+import {bookmarkDao} from "../../BookmarkApplicationContext";
 
 export class ChangeBookmarkHandler implements Handler {
 
