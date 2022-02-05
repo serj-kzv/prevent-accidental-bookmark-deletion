@@ -12,7 +12,7 @@ export class BookmarkApplication {
         console.debug('BookmarkApplication run deleteAll for development purposes', await bookmarkDao.deleteAll());
         console.debug('BookmarkApplication allDocs after', await bookmarkDao.findAll());
         await this.init();
-        console.debug('BookmarkApplication run inited');
+        console.debug('BookmarkApplication run was initialized');
     }
 
     private async init(): Promise<void> {

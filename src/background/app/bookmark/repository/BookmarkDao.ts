@@ -8,7 +8,7 @@ import {default as PouchDB} from "pouchdb-browser";
 export default class BookmarkDao extends BaseDao<Bookmark, BookmarkQuery> {
 
     public constructor(db: PouchDB.Database<Bookmark>) {
-        super(db, BookmarkQuery);
+        super(db);
     }
 
     public async saveChildByParentQuery(query: BookmarkQuery, bookmark: Bookmark): Promise<Bookmark> {

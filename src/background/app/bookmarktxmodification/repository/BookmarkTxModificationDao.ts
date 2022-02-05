@@ -6,7 +6,7 @@ import BookmarkTxModificationQuery from "../model/BookmarkTxModificationQuery";
 export default class BookmarkTxModificationDao extends BaseDao<BookmarkTxModification, BookmarkTxModificationQuery>{
 
     public constructor(db: PouchDB.Database<BookmarkTxModification>) {
-        super(db, BookmarkTxModificationQuery);
+        super(db);
     }
 
 }
