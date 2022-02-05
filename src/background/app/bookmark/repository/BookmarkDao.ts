@@ -18,7 +18,7 @@ export default class BookmarkDao extends BaseDao<Bookmark, BookmarkQuery> {
         const parentBookmark: Bookmark = await this.findOne(query);
 
         if (parentBookmark) {
-            bookmark.parentId = parentBookmark.id;
+            bookmark.parentId = parentBookmark.getId();
 
             return this.save(bookmark);
         }

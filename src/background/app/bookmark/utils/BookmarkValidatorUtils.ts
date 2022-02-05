@@ -6,7 +6,7 @@ export abstract class BookmarkValidatorUtils {
     }
 
     public static validateNotEmptyQuery(query: BookmarkQuery): void {
-        if (query.id || query.url || query.index || query.type || query.title || query.parentId) {
+        if (query.getId() || query.url || query.index || query.type || query.title || query.parentId) {
            return;
         }
 
