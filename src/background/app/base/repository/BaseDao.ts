@@ -5,19 +5,20 @@ import IdentifiableObject from "../model/IdentifiableObject";
 
 export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
 
+    private daoTypeName = this.constructor.name;
     private dbQueryType: any = IdentifiableObject;
 
     protected constructor(public db: PouchDB.Database<T> = null) {
     }
 
     public async save(payload: T): Promise<T> {
-        console.debug('BookmarkDao save', payload);
+        console.debug(`${this.daoTypeName} save`, payload);
 
         IdentifiableValidatorUtils.validateHasId(payload);
 
-        const foundBookmark: T = await this.findById(payload.getId());
+        const foundPayload: T = await this.findById(payload.getId());
 
-        if (foundBookmark) {
+        if (foundPayload) {
             throw new Error('Already exists');
         }
 
@@ -35,19 +36,19 @@ export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
     }
 
     public async find(query: Q): Promise<T[]> {
-        console.debug('BookmarkDao find', query);
+        console.debug(`${this.daoTypeName} find`, query);
 
         // TODO: find does not work
         const docs = (await this.db.find({selector: query})).docs;
 
-        console.debug('BookmarkDao find found', query, docs);
+        console.debug(`${this.daoTypeName} find found`, query, docs);
 
         return docs;
     }
 
     public async findOne(query: Q): Promise<T | null> {
-        const bookmarks: T[] = await this.find(query);
-        const count: number = bookmarks.length;
+        const payloads: T[] = await this.find(query);
+        const count: number = payloads.length;
 
         if (count < 1) {
             return null;
@@ -55,7 +56,7 @@ export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
             throw new Error('Multi values');
         }
 
-        return bookmarks[0];
+        return payloads[0];
     }
 
     public async findById(id: string): Promise<T | null> {
@@ -65,20 +66,20 @@ export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
     }
 
     public async findAll(): Promise<T[]> {
-        console.debug('BookmarkDao findAll');
+        console.debug(`${this.daoTypeName} findAll`);
         const rows = (await this.db.allDocs({include_docs: true})).rows;
 
         return rows.map(row => row.doc as T);
     }
 
     public async delete(query: Q): Promise<void> {
-        console.debug('BookmarkDao delete', query, await this.find(query));
+        console.debug(`${this.daoTypeName} delete`, query, await this.find(query));
 
         await Promise.allSettled((await this.find(query))
             .map(async payload => {
                 const doc = await this.db.get(payload.getId());
 
-                console.debug('BookmarkDao delete doc', doc);
+                console.debug(`${this.daoTypeName} delete doc`, doc);
 
                 await this.db.remove(doc);
             }));
@@ -91,7 +92,7 @@ export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
     }
 
     public async deleteAll(): Promise<void> {
-        console.debug('BookmarkDao deleteAll', (await this.db.allDocs()).rows);
+        console.debug(`${this.daoTypeName} deleteAll`, (await this.db.allDocs()).rows);
 
         await Promise.allSettled((await this.db.allDocs()).rows
             .map(async ({id}) => await this.deleteById(id)));
