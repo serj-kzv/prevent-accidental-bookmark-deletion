@@ -14,6 +14,10 @@ export default class BookmarkTxModificationService {
 
     async stop(id: string): Promise<void> {
         await bookmarkTxModificationDao.deleteById(id);
+        this.release(id);
+    }
+
+    release(id: string): void {
         Utils.removeFromArray(this.txInProgress, id);
     }
 

@@ -20,13 +20,17 @@ export default class BookmarkRestoreService {
         } catch (e) {
             console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
 
+            await bookmarkTxModificationService.release(id);
+
             throw e;
         }
     }
 
     async restoreAllDelayedTx(): Promise<void> {
-        (await bookmarkTxModificationService.findAllTxsNotInProgress())
-            .forEach(tx => this.rollbackTxAndRestore(tx.getId()));
+        Promise.allSettled(
+            (await bookmarkTxModificationService.findAllTxsNotInProgress())
+                .map(async tx => this.rollbackTxAndRestore(tx.getId()))
+        );
     }
 
     async restore(id: string): Promise<void> {
