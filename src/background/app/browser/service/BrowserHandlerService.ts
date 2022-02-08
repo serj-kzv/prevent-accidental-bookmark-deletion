@@ -4,7 +4,7 @@ export default class BrowserHandlerService {
 
     async checkTxAndRunRestore(): Promise<void> {
         (await bookmarkTxModificationService.findAllTxsNotInProgress())
-            .forEach(tx => bookmarkRestoreService.rollbackAndRestoreTx(tx.getId()));
+            .forEach(tx => bookmarkRestoreService.rollbackTxAndRestore(tx.getId()));
     }
 
 }

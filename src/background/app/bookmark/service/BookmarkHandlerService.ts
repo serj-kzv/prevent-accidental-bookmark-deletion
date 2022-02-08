@@ -36,7 +36,7 @@ export default class BookmarkHandlerService {
 
     async restoreOnRemove(id: string, removeInfo: BookmarkRemoveInfo): Promise<void> {
         if (!bookmarkApiService.canRemove(id)) {
-            await bookmarkRestoreService.restoreWithTx(id);
+            await bookmarkRestoreService.startTxAndRestore(id);
         }
     }
 
