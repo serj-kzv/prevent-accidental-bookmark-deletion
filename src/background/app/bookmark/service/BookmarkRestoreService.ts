@@ -7,6 +7,7 @@ export default class BookmarkRestoreService {
         try {
             await this.restore(id);
             await bookmarkTxModificationService.stop(id);
+            this.restoreAllDelayedTx();
         } catch (e) {
             console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
 
@@ -18,17 +19,26 @@ export default class BookmarkRestoreService {
 
     async restoreAllDelayedTx(): Promise<void> {
         (await bookmarkTxModificationService.findAllTxsNotInProgress())
-            .forEach(tx => this.rollbackAndRestore(tx.getId()));
+            .forEach(tx => this.rollbackAndRestoreTx(tx.getId()));
     }
 
     async restore(id: string): Promise<void> {
 
     }
 
-    async rollbackAndRestore(id: string): Promise<void> {
-        await bookmarkApiService.removeById(id);
-        await this.restore(id);
-        await bookmarkTxModificationService.stop(id);
+    async rollbackAndRestoreTx(id: string): Promise<void> {
+        try {
+            await bookmarkApiService.removeById(id);
+            await this.restore(id);
+            await bookmarkTxModificationService.stop(id);
+            this.restoreAllDelayedTx();
+        } catch (e) {
+            console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
+
+            this.restoreAllDelayedTx();
+
+            throw e;
+        }
     }
 
     // step 1.1
