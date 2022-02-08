@@ -11,8 +11,6 @@ export default class BookmarkRestoreService {
         } catch (e) {
             console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
 
-            this.restoreAllDelayedTx();
-
             throw e;
         }
     }
@@ -34,8 +32,6 @@ export default class BookmarkRestoreService {
             this.restoreAllDelayedTx();
         } catch (e) {
             console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
-
-            this.restoreAllDelayedTx();
 
             throw e;
         }
