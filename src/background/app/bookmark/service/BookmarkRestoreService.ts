@@ -6,13 +6,13 @@ export default class BookmarkRestoreService {
         await bookmarkTxModificationService.start(id);
         try {
             await this.restore(id);
+            await bookmarkTxModificationService.stop(id);
+            this.restoreAllDelayedTx();
         } catch (e) {
             console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
 
             throw e;
         }
-        await bookmarkTxModificationService.stop(id);
-        this.restoreAllDelayedTx();
     }
 
     async restoreAllDelayedTx(): Promise<void> {
