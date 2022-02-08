@@ -13,7 +13,6 @@ export default class BookmarkRestoreService {
     }
 
     async continueTxAndRestore(id: string): Promise<void> {
-        await bookmarkTxModificationService.start(id);
         try {
             await this.restore(id);
             await bookmarkTxModificationService.stop(id);
