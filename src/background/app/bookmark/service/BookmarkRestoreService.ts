@@ -16,7 +16,7 @@ export default class BookmarkRestoreService {
         try {
             await this.restore(id);
             await bookmarkTxModificationService.stop(id);
-            this.restoreAllDelayedTx();
+            this.restoreAllDelayedTx(); // TODO: was not it should be wrapped in try?
         } catch (e) {
             console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
 
