@@ -5,13 +5,11 @@ import IdentifiableQuery from "../model/IdentifiableQuery";
 
 export abstract class BaseDao<T extends Identifiable, Q extends IdentifiableQuery> {
 
-    private daoTypeName = this.constructor.name;
-
     protected constructor(public db: PouchDB.Database<T> = null) {
     }
 
     public async save(payload: T): Promise<T> {
-        console.debug(`${this.daoTypeName} save`, payload);
+        console.debug(`${this.constructor.name} save`, payload);
 
         IdentifiableValidatorUtils.validateHasId(payload);
 
@@ -35,12 +33,12 @@ export abstract class BaseDao<T extends Identifiable, Q extends IdentifiableQuer
     }
 
     public async find(query: Q): Promise<T[]> {
-        console.debug(`${this.daoTypeName} find`, query);
+        console.debug(`${this.constructor.name} find`, query);
 
-        // TODO: find does not work
+        // TODO: find does not work here
         const docs = (await this.db.find({selector: query})).docs;
 
-        console.debug(`${this.daoTypeName} find found`, query, docs);
+        console.debug(`${this.constructor.name} find found`, query, docs);
 
         return docs;
     }
@@ -65,20 +63,20 @@ export abstract class BaseDao<T extends Identifiable, Q extends IdentifiableQuer
     }
 
     public async findAll(): Promise<T[]> {
-        console.debug(`${this.daoTypeName} findAll`);
+        console.debug(`${this.constructor.name} findAll`);
         const rows = (await this.db.allDocs({include_docs: true})).rows;
 
         return rows.map(row => row.doc as T);
     }
 
     public async delete(query: Q): Promise<void> {
-        console.debug(`${this.daoTypeName} delete`, query, await this.find(query));
+        console.debug(`${this.constructor.name} delete`, query, await this.find(query));
 
         await Promise.allSettled((await this.find(query))
             .map(async payload => {
                 const doc = await this.db.get(payload.getId());
 
-                console.debug(`${this.daoTypeName} delete doc`, doc);
+                console.debug(`${this.constructor.name} delete doc`, doc);
 
                 await this.db.remove(doc);
             }));
@@ -86,12 +84,11 @@ export abstract class BaseDao<T extends Identifiable, Q extends IdentifiableQuer
 
     public async deleteById(id: string): Promise<void> {
         IdentifiableValidatorUtils.validateId(id);
-
-        await this.delete(new IdentifiableQuery(id));
+        await this.delete(new IdentifiableQuery(id) as any); // TODO: find better way without any
     }
 
     public async deleteAll(): Promise<void> {
-        console.debug(`${this.daoTypeName} deleteAll`, (await this.db.allDocs()).rows);
+        console.debug(`${this.constructor.name} deleteAll`, (await this.db.allDocs()).rows);
 
         await Promise.allSettled((await this.db.allDocs()).rows
             .map(async ({id}) => await this.deleteById(id)));
