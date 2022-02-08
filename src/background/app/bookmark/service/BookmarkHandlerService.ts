@@ -1,10 +1,4 @@
-import {
-    bookmarkApiService,
-    bookmarkDao,
-    bookmarkRestoreService,
-    bookmarkStore,
-    bookmarkTxModificationService
-} from "../../BookmarkApplicationContext";
+import {bookmarkApiService, bookmarkDao, bookmarkRestoreService} from "../../BookmarkApplicationContext";
 import {Bookmark} from "../model/Bookmark";
 import BookmarkMoveInfo from "../model/BookmarkMoveInfo";
 import BookmarkRemoveInfo from "../model/BookmarkRemoveInfo";

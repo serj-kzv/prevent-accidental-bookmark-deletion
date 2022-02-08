@@ -1,6 +1,6 @@
-import IdentifiableObject from "../../base/model/IdentifiableObject";
+import IdentifiableQuery from "../../base/model/IdentifiableQuery";
 
-export default class BookmarkTxModificationQuery extends IdentifiableObject {
+export default class BookmarkTxModificationQuery extends IdentifiableQuery {
 
     public constructor(
         id?: string,

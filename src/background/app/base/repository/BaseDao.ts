@@ -1,12 +1,11 @@
 import {default as PouchDB} from "pouchdb-browser";
 import {Identifiable} from "../model/Identifiable";
 import IdentifiableValidatorUtils from "../../utils/IdentifiableValidatorUtils";
-import IdentifiableObject from "../model/IdentifiableObject";
+import IdentifiableQuery from "../model/IdentifiableQuery";
 
-export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
+export abstract class BaseDao<T extends Identifiable, Q extends IdentifiableQuery> {
 
     private daoTypeName = this.constructor.name;
-    private dbQueryType: any = IdentifiableObject;
 
     protected constructor(public db: PouchDB.Database<T> = null) {
     }
@@ -62,7 +61,7 @@ export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
     public async findById(id: string): Promise<T | null> {
         IdentifiableValidatorUtils.validateId(id);
 
-        return this.findOne(new this.dbQueryType(id));
+        return this.findOne(new IdentifiableQuery(id) as Q);
     }
 
     public async findAll(): Promise<T[]> {
@@ -88,7 +87,7 @@ export abstract class BaseDao<T extends Identifiable, Q extends Identifiable> {
     public async deleteById(id: string): Promise<void> {
         IdentifiableValidatorUtils.validateId(id);
 
-        await this.delete(new this.dbQueryType(id));
+        await this.delete(new IdentifiableQuery(id));
     }
 
     public async deleteAll(): Promise<void> {

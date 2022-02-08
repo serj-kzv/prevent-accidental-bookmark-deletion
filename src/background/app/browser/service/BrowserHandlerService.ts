@@ -3,7 +3,7 @@ import {bookmarkRestoreService, bookmarkTxModificationService} from "../../Bookm
 export default class BrowserHandlerService {
 
     async checkTxAndRunRestore(): Promise<void> {
-        (await bookmarkTxModificationService.findAllTxs())
+        (await bookmarkTxModificationService.findAllTxsNotInProgress())
             .forEach(tx => bookmarkRestoreService.rollbackAndRestore(tx.getId()));
     }
 

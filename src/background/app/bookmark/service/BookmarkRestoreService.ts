@@ -1,11 +1,23 @@
-import {bookmarkApiService, bookmarkStore, bookmarkTxModificationService} from "../../BookmarkApplicationContext";
+import {bookmarkApiService, bookmarkTxModificationService} from "../../BookmarkApplicationContext";
 
 export default class BookmarkRestoreService {
 
     async restoreWithTx(id: string): Promise<void> {
         await bookmarkTxModificationService.start(id);
-        await this.restore(id);
+        try {
+            await this.restore(id);
+        } catch (e) {
+            console.debug(`Tx for bookmark with id=${id} is failed and possibly will be delayed until parent bookmark tx will be done.`);
+
+            throw e;
+        }
         await bookmarkTxModificationService.stop(id);
+        this.restoreAllDelayedTx();
+    }
+
+    async restoreAllDelayedTx(): Promise<void> {
+        (await bookmarkTxModificationService.findAllTxsNotInProgress())
+            .forEach(tx => this.rollbackAndRestore(tx.getId()));
     }
 
     async restore(id: string): Promise<void> {

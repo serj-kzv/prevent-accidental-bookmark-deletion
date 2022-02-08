@@ -1,7 +1,7 @@
 import {BookmarkType} from "./BookmarkType";
-import IdentifiableObject from "../../base/model/IdentifiableObject";
+import IdentifiableQuery from "../../base/model/IdentifiableQuery";
 
-export class BookmarkQuery extends IdentifiableObject {
+export class BookmarkQuery extends IdentifiableQuery {
 
     public constructor(
         id?: string,
