@@ -20,7 +20,7 @@ class BookmarkCreator {
     }
 
     async #execQueueIfParentFound(type, bookmark) {
-        if (type === BookmarkTypeEnum.FOLDER) {
+        if (BookmarkTypeEnum.isFolder(type)) {
             console.debug('execQueueIfParentFound starts', bookmark);
             const {id} = bookmark;
             const queue = this.#queues.get(id);

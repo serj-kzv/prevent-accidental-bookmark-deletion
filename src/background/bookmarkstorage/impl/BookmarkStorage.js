@@ -1,5 +1,5 @@
-import AbstractBookmarkStorage from "./AbstractBookmarkStorage.js";
-import BookmarkStorageMode from "./BookmarkStorageMode.js";
+import AbstractBookmarkStorage from "../AbstractBookmarkStorage.js";
+import BookmarkStorageMode from "../BookmarkStorageMode.js";
 import LocalBookmarkStorage from "./LocalBookmarkStorage.js";
 import MemoryBookmarkStorage from "./MemoryBookmarkStorage.js";
 
