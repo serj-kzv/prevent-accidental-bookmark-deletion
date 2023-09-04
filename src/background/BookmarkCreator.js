@@ -1,14 +1,15 @@
 import BookmarkTypeEnum from "./BookmarkTypeEnum.js";
+import BookmarkStorageUtils from "./bookmarkstorage/BookmarkStorageUtils.js";
 
 class BookmarkCreator {
     #queues = new Map();
 
     async create(index, bookmark) {
         const {parentId, type, url, title} = bookmark;
-        const parentBookmark = await browser.bookmarks.get(parentId);
+        const parentBookmarks = await browser.bookmarks.get(parentId);
         const createCallbackFn = () => this.#execQueueIfParentFound(type, bookmark);
 
-        if (parentBookmark.length < 1) {
+        if (parentBookmarks.length < 1) {
             this.#createInQueue(index, parentId, type, url, title, createCallbackFn);
         } else {
             try {
@@ -22,8 +23,9 @@ class BookmarkCreator {
     async #execQueueIfParentFound(type, bookmark) {
         if (BookmarkTypeEnum.isFolder(type)) {
             console.debug('execQueueIfParentFound starts', bookmark);
-            const {id} = bookmark;
-            const queue = this.#queues.get(id);
+            const {id, parentId} = bookmark;
+            const key = BookmarkStorageUtils.makeStorageKey(id, parentId);
+            const queue = this.#queues.get(key);
 
             if (queue) {
                 console.debug('execQueueIfParentFound, queue will exec', queue);
@@ -43,7 +45,7 @@ class BookmarkCreator {
                 } else {
                     console.debug('execQueueIfParentFound, queueToExec will not exec', queue);
                 }
-                this.#queues.delete(id);
+                this.#queues.delete(key);
             }
         }
     }
@@ -77,15 +79,15 @@ class BookmarkCreator {
         });
     }
 
-    #createOrGetQueue(id) {
+    #createOrGetQueue(key) {
         const queues = this.#queues;
 
-        if (queues.has(id)) {
-            return queues.get(id);
+        if (queues.has(key)) {
+            return queues.get(key);
         } else {
             const queue = [];
 
-            queues.set(id, queue);
+            queues.set(key, queue);
 
             return queue;
         }

@@ -1,3 +1,5 @@
+import BookmarkStorageUtils from "../BookmarkStorageUtils.js";
+
 class MemoryBookmarkStorage {
     #storage;
 
@@ -11,25 +13,27 @@ class MemoryBookmarkStorage {
 
     async #init() {
         this.#storage = new Map();
-        (await browser.bookmarks.search({}))
-            .forEach(bookmark => {
-                const {id} = bookmark;
+        (await browser.bookmarks.search({})).forEach(bookmark => {
+            const {id, parentId} = bookmark;
+            const key = BookmarkStorageUtils.makeStorageKey(id, parentId);
 
-                this.#storage.set(id, bookmark);
-            });
+            this.#storage.set(key, bookmark);
+        });
         console.debug('init storage state is', this.#storage);
     }
 
-    async get(id) {
-        return this.#storage.get(id);
+    async get(key) {
+        return this.#storage.get(key);
     }
 
-    async save(id, bookmark) {
-        return this.#storage.set(id, bookmark);
+    async save(key, bookmark) {
+        const {parentId} = bookmark;
+
+        return this.#storage.set(key, bookmark);
     }
 
-    async delete(id) {
-        return this.#storage.delete(id);
+    async delete(key) {
+        return this.#storage.delete(key);
     }
 
     async destroy() {
