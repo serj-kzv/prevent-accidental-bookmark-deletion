@@ -27,7 +27,7 @@ class BookmarkStorage extends AbstractBookmarkStorage {
             console.debug('Will be added to storage, parentId', parentId);
             console.debug('Will be added to storage, key', key);
 
-            await this.save(key, bookmark);
+            this.#storage.save(bookmark);
         };
         this.#onChangedListener = async (id, bookmark) => {
             const {parentId} = bookmark;
@@ -37,24 +37,10 @@ class BookmarkStorage extends AbstractBookmarkStorage {
             console.debug('Will be added to storage, parentId', parentId);
             console.debug('Will be added to storage, key', key);
 
-            await this.save(key, bookmark);
+            this.#storage.save(bookmark);
         };
         browser.bookmarks.onCreated.addListener(this.#onCreatedListener);
         browser.bookmarks.onChanged.addListener(this.#onChangedListener);
-    }
-
-    async get(id) {
-        return await this.#storage.get(id);
-    }
-
-    async save(key, bookmark) {
-        const {id, parentId} = bookmark;
-
-        await this.#storage.save(id, bookmark);
-    }
-
-    async delete(id) {
-        return await this.#storage.delete(id);
     }
 
     async activateMemoryStorageMode() {
