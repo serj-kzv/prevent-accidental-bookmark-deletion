@@ -1,7 +1,7 @@
-import AbstractBookmarkStorage from "../AbstractBookmarkStorage.js";
-import BookmarkStorageMode from "../BookmarkStorageMode.js";
+import AbstractBookmarkStorage from "./AbstractBookmarkStorage.js";
+import BookmarkStorageMode from "./BookmarkStorageMode.js";
 import MemoryBookmarkStorage from "./MemoryBookmarkStorage.js";
-import BookmarkStorageUtils from "../BookmarkStorageUtils.js";
+import BookmarkStorageUtils from "./BookmarkStorageUtils.js";
 
 class BookmarkStorage extends AbstractBookmarkStorage {
     #mode;
@@ -43,16 +43,18 @@ class BookmarkStorage extends AbstractBookmarkStorage {
         browser.bookmarks.onChanged.addListener(this.#onChangedListener);
     }
 
-    async get(key) {
-        return await this.#storage.get(key);
+    async get(id) {
+        return await this.#storage.get(id);
     }
 
     async save(key, bookmark) {
-        return await this.#storage.save(key, bookmark);
+        const {id, parentId} = bookmark;
+
+        await this.#storage.save(id, bookmark);
     }
 
-    async delete(key) {
-        return await this.#storage.delete(key);
+    async delete(id) {
+        return await this.#storage.delete(id);
     }
 
     async activateMemoryStorageMode() {

@@ -1,5 +1,5 @@
 import BookmarkCreator from "./BookmarkCreator.js";
-import BookmarkStorage from "./bookmarkstorage/impl/BookmarkStorage.js";
+import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
 import BookmarkStorageUtils from "./bookmarkstorage/BookmarkStorageUtils.js";
 
 class PreventBookmarkRemoval {
