@@ -1,6 +1,3 @@
-import BookmarkTypeEnum from "./BookmarkTypeEnum.js";
-import BookmarkStorageUtils from "./bookmarkstorage/BookmarkStorageUtils.js";
-
 class BookmarkCreator {
 
     async create(index, bookmark) {

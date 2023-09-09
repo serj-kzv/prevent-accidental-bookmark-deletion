@@ -1,5 +1,3 @@
-import BookmarkStorageUtils from "./BookmarkStorageUtils.js";
-
 class MemoryBookmarkStorage {
     #storage;
     #parentStorage;

@@ -1,5 +1,5 @@
 import BookmarkCreator from "./BookmarkCreator.js";
-import BookmarkStorageUtils from "./bookmarkstorage/BookmarkStorageUtils.js";
+import MemoryBookmarkStorage from "./bookmarkstorage/MemoryBookmarkStorage";
 
 class PreventBookmarkRemoval {
     #storage;
@@ -17,10 +17,12 @@ class PreventBookmarkRemoval {
     }
 
     async #init() {
-        console.debug('start PreventBookmarkRemoval init');
+        console.debug('start PreventBookmarkRemoval initialization starts');
+        this.#storage = await MemoryBookmarkStorage.build();
         await this.#initOnCreatedListener();
         await this.#initOnChangedListener();
         await this.#initOnRemovedListener();
+        console.debug('start PreventBookmarkRemoval initialized');
     }
 
     async #initOnCreatedListener() {
@@ -40,9 +42,9 @@ class PreventBookmarkRemoval {
         this.#onChangedListener = async (id, bookmark) => {
             const {parentId} = bookmark;
 
-            console.debug('Will be added to storage', bookmark);
-            console.debug('Will be added to storage, parentId', parentId);
-            console.debug('Will be added to storage, id', id);
+            console.debug('Will be changed in storage', bookmark);
+            console.debug('Will be changed in storage, parentId', parentId);
+            console.debug('Will be changed in storage, id', id);
 
             this.#storage.save(bookmark);
         };
@@ -50,23 +52,29 @@ class PreventBookmarkRemoval {
     }
 
     async #initOnRemovedListener() {
+        const that = this;
+
         this.#onRemovedListener = async (id, {index, node}) => {
-            const {parentId} = node;
-
-            console.debug('Recreation is started.');
-            console.debug('id', id);
-            console.debug('parentId', parentId);
-            console.debug('node', node);
-
-            const bookmark = await this.#storage.get(id);
-
-            console.debug('index', index);
-            console.debug('bookmark', bookmark);
-
-            await this.#storage.delete(id);
-            this.#bookmarkCreator.create(index, bookmark);
+            await that.#recreateBookmark(id, index, node);
         };
         browser.bookmarks.onRemoved.addListener(this.#onRemovedListener);
+    }
+
+    async #recreateBookmark(id, index, node) {
+        const {parentId} = node;
+
+        console.debug('Recreation is started.');
+        console.debug('id', id);
+        console.debug('parentId', parentId);
+        console.debug('node', node);
+
+        const bookmark = await this.#storage.get(id);
+
+        console.debug('index', index);
+        console.debug('bookmark', bookmark);
+
+        await this.#storage.delete(id);
+        this.#bookmarkCreator.create(index, bookmark);
     }
 
     async destroy() {
