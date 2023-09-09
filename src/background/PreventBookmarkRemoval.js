@@ -1,5 +1,5 @@
 import BookmarkCreator from "./BookmarkCreator.js";
-import MemoryBookmarkStorage from "./bookmarkstorage/MemoryBookmarkStorage";
+import BookmarkStorage from "./bookmarkstorage/BookmarkStorage";
 
 class PreventBookmarkRemoval {
     #storage;
@@ -18,7 +18,7 @@ class PreventBookmarkRemoval {
 
     async #init() {
         console.debug('start PreventBookmarkRemoval initialization starts');
-        this.#storage = await MemoryBookmarkStorage.build();
+        this.#storage = await BookmarkStorage.build();
         await this.#initOnCreatedListener();
         await this.#initOnChangedListener();
         await this.#initOnRemovedListener();
@@ -75,6 +75,10 @@ class PreventBookmarkRemoval {
 
         await this.#storage.delete(id);
         this.#bookmarkCreator.create(index, bookmark);
+    }
+
+    findBookmarkRecursively(bookmark) {
+
     }
 
     async destroy() {
