@@ -17,9 +17,8 @@ class MemoryBookmarkStorage {
         this.#parentStorage = new Map();
         (await browser.bookmarks.search({})).forEach(bookmark => {
             const {id, parentId} = bookmark;
-            const key = BookmarkStorageUtils.makeStorageKey(id, parentId);
 
-            this.#storage.set(key, bookmark);
+            this.#storage.set(id, bookmark);
         });
         console.debug('init storage state is', this.#storage);
     }
