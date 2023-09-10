@@ -1,8 +1,7 @@
-class BookmarkTypeEnum {
+export default class BookmarkTypeEnum {
     static BOOKMARK = 'bookmark';
     static FOLDER = 'folder';
     static SEPARATOR = 'separator';
-    static NONE = '';
 
     static isBookmark(type) {
         return BookmarkTypeEnum.BOOKMARK === type;
@@ -12,6 +11,18 @@ class BookmarkTypeEnum {
         return BookmarkTypeEnum.FOLDER === type;
     }
 
-}
+    static isSeparator(type) {
+        return BookmarkTypeEnum.SEPARATOR === type;
+    }
 
-export default BookmarkTypeEnum;
+    static isValidType(type) {
+        return BookmarkTypeEnum.isBookmark(type)
+        || BookmarkTypeEnum.isFolder(type)
+        || BookmarkTypeEnum.isSeparator(type);
+    }
+
+    static isNotValidType(type) {
+        return !BookmarkTypeEnum.isValidType(type);
+    }
+
+}

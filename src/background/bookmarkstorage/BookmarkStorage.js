@@ -1,23 +1,22 @@
 class BookmarkStorage {
     #storage;
 
-    static async build() {
+    static async build(bookmarks) {
         const storage = new BookmarkStorage();
 
-        await storage.#init();
+        await storage.#init(bookmarks);
 
         return storage;
     }
 
-    async #init() {
+    async #init(bookmarks) {
         this.#storage = new Map();
-        (await browser.bookmarks.search({})).forEach(bookmark => {
+        bookmarks.forEach(bookmark => {
             const {id} = bookmark;
 
             this.#storage.set(id, bookmark);
         });
-        console.log('tree of bookmarks', await browser.bookmarks.getTree());
-        console.log('root of bookmarks', await browser.bookmarks.get(['root________']));
+
         console.debug('init storage state is', this.#storage);
     }
 
