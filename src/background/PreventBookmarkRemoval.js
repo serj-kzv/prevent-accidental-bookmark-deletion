@@ -87,19 +87,21 @@ export default class PreventBookmarkRemoval {
         if (BookmarkTypeEnum.isFolder(node.type)) {
             console.debug('Recreation is started. Bookmark type is folder starts');
 
-            const bookmarks = await this.#storage.getChildrenRecursiveById(id);
+            const bookmarks = this.#storage.getChildrenRecursiveById(id);
+
+            console.debug('Recursive gotten bookmarks to recreate', bookmarks);
 
             const bookmarkFoldersOnly = bookmarks
-                .forEach(bookmarks => bookmarks.filter(({type}) => BookmarkTypeEnum.isFolder(type)));
+                .map(bookmarks => bookmarks.filter(({type}) => BookmarkTypeEnum.isFolder(type)));
 
-            console.debug('Recreation is started. Bookmark type is folder starts. Bookmarks folder to recreate', bookmarkFoldersOnly);
+            console.debug('Bookmark folders to recreate', bookmarkFoldersOnly);
 
             await Promise.allSettled(this.#bookmarksToRecreateBookmarks(bookmarkFoldersOnly));
 
             const bookmarksOnly = bookmarks
-                .forEach(bookmarks => bookmarks.filter(({type}) => !BookmarkTypeEnum.isFolder(type)));
+                .map(bookmarks => bookmarks.filter(({type}) => !BookmarkTypeEnum.isFolder(type)));
 
-            console.debug('Recreation is started. Bookmark type is folder starts. Bookmarks to recreate', bookmarksOnly);
+            console.debug('Bookmarks to recreate', bookmarksOnly);
 
             await Promise.allSettled(this.#bookmarksToRecreateBookmarks(bookmarksOnly));
 
