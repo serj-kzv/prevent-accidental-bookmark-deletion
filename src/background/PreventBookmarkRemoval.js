@@ -98,14 +98,14 @@ export default class PreventBookmarkRemoval {
             console.debug('Start bookmark folder recreation');
 
             const recreatedFolders = await Promise
-                .allSettled(this.#makeRecreateOperations(foldersAndBookmark.foldersOnly));
+                .all(this.#makeRecreateOperations(foldersAndBookmark.foldersOnly));
 
             console.debug('End bookmark folder recreation', recreatedFolders);
 
             console.debug('Start bookmark recreation');
 
             const recreatedBookmarks = await Promise
-                .allSettled(this.#makeRecreateOperations(foldersAndBookmark.bookmarksOnly));
+                .all(this.#makeRecreateOperations(foldersAndBookmark.bookmarksOnly));
 
             console.debug('End bookmark recreation', recreatedBookmarks);
 
@@ -156,8 +156,12 @@ export default class PreventBookmarkRemoval {
         const createdBookmarkArray = bookmarkArrays[0]
             .map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark));
 
-        let currentNewIds = createdBookmarkArray.map(({id, oldId}) => [id, oldId]);
+        let currentNewIds = createdBookmarkArray
+            .map((bookmark, oldId) => [oldId, bookmark.id]);
+        console.debug('first new id - old id Map', currentNewIds);
         currentNewIds = new Map(currentNewIds);
+
+        console.debug('first new id - old id Map', currentNewIds);
 
         const createdBookmarkArrays = [];
 
@@ -169,13 +173,17 @@ export default class PreventBookmarkRemoval {
                 });
 
             currentNewIds = currentCreatedBookmarkArray
-                .map(({id, oldId}) => [id, oldId]);
+                .map((bookmark, oldId) => [oldId, bookmark.id]);
+            console.debug('first new id - old id Map', currentNewIds);
             currentNewIds = new Map(currentNewIds);
+
+            console.debug('first new id - old id Map', currentNewIds);
 
             createdBookmarkArrays.push(currentCreatedBookmarkArray);
         }
 
-        return [createdBookmarkArray, ...createdBookmarkArrays];
+        return [createdBookmarkArray, ...createdBookmarkArrays]
+            .map(createdBookmarkArray => Promise.all(createdBookmarkArray));
     }
 
     async destroy() {
