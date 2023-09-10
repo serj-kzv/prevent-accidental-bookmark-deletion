@@ -1,7 +1,7 @@
 export default class BookmarkIdEnum {
     static BOOKMARK_ROOT_ID = 'root________';
 
-    isRootId(id) {
+    static isRootId(id) {
         return BookmarkIdEnum.BOOKMARK_ROOT_ID === id;
     }
 

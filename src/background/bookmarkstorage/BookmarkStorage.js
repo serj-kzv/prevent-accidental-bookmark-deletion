@@ -1,4 +1,4 @@
-class BookmarkStorage {
+export default class BookmarkStorage {
     #storage;
 
     static async build(bookmarks) {
@@ -59,5 +59,3 @@ class BookmarkStorage {
     }
 
 }
-
-export default BookmarkStorage;

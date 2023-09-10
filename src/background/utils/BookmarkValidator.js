@@ -11,6 +11,7 @@ export default class BookmarkValidator {
             BookmarkValidator.validateIfThereIsOnlyOneBookmarkRoot(),
             BookmarkValidator.validateIfBookmarkRootHasAnId(),
             BookmarkValidator.validateIfBookmarkRootHasValidId(),
+            BookmarkValidator.validateIfBookmarksHaveOnlyValidTypes(),
         ]);
     }
 
@@ -50,14 +51,11 @@ export default class BookmarkValidator {
 
     static async validateIfBookmarkRootHasAnId() {
         const bookmarkTree = await browser.bookmarks.getTree();
-
-        console.log('bookmarkTree', bookmarkTree);
-
-        const {id} = bookmarkTree[0];
-        const isValid = Utils.isNotUndefinedOrNull(id);
+        const rootBookmark = bookmarkTree[0];
+        const isValid = Utils.isNotUndefinedOrNull(rootBookmark.id);
 
         if (isValid) {
-            console.debug('There is root bookmark id');
+            console.debug('There is root bookmark id', rootBookmark);
         } else {
             console.error('There is no root bookmark id');
         }
@@ -65,14 +63,11 @@ export default class BookmarkValidator {
 
     static async validateIfBookmarkRootHasValidId() {
         const bookmarkTree = await browser.bookmarks.getTree();
-
-        console.log('bookmarkTree', bookmarkTree);
-
-        const {id} = bookmarkTree[0];
-        const isValid = BookmarkIdEnum.isRootId(id);
+        const rootBookmark = bookmarkTree[0];
+        const isValid = BookmarkIdEnum.isRootId(rootBookmark.id);
 
         if (isValid) {
-            console.debug('root bookmark has valid id');
+            console.debug('root bookmark has valid id', rootBookmark);
         } else {
             console.error('root bookmark has not valid id');
         }
@@ -85,7 +80,7 @@ export default class BookmarkValidator {
         types.push(type);
 
         const isNotValidTypes = types.filter(type => BookmarkTypeEnum.isNotValidType(type));
-        const isValid = isNotValidTypes.length > 0;
+        const isValid = isNotValidTypes.length < 1;
 
         if (isValid) {
             console.debug('bookmarks have valid types');
