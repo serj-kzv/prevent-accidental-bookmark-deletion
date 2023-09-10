@@ -153,21 +153,29 @@ export default class PreventBookmarkRemoval {
     }
 
     #makeRecreateOperations(bookmarkArrays) {
-        let createdBookmarkArray = bookmarkArrays[0]
-            .map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark))
-            .map(({id, oldId}) => [id, oldId]);
-        createdBookmarkArray = new Map(createdBookmarkArray);
+        const createdBookmarkArray = bookmarkArrays[0]
+            .map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark));
+
+        let currentNewIds = createdBookmarkArray.map(({id, oldId}) => [id, oldId]);
+        currentNewIds = new Map(currentNewIds);
+
+        const createdBookmarkArrays = [];
+
         for (const bookmarkArray of bookmarkArrays.slice(1, bookmarkArrays.length)) {
-            createdBookmarkArray = bookmarkArray
+            const currentCreatedBookmarkArray = bookmarkArray
                 .map(async bookmark => {
-                    bookmark.parentId = createdBookmarkArray.get(bookmark.parentId);
-                    return await this.#bookmarkCreator.create(bookmark.index, bookmark)
-                })
+                    bookmark.parentId = currentNewIds.get(bookmark.parentId);
+                    return await this.#bookmarkCreator.create(bookmark.index, bookmark);
+                });
+
+            currentNewIds = currentCreatedBookmarkArray
                 .map(({id, oldId}) => [id, oldId]);
-            createdBookmarkArray = new Map(createdBookmarkArray);
+            currentNewIds = new Map(currentNewIds);
+
+            createdBookmarkArrays.push(currentCreatedBookmarkArray);
         }
 
-        return [recreateBookmarkOperation, ...recreateBookmarkOperations];
+        return [createdBookmarkArray, ...createdBookmarkArrays];
     }
 
     async destroy() {
