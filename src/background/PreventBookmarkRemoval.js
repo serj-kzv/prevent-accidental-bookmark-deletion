@@ -91,19 +91,21 @@ export default class PreventBookmarkRemoval {
 
             console.debug('Recursive gotten bookmarks to recreate', bookmarks);
 
-            const bookmarkFoldersOnly = bookmarks
-                .map(bookmarks => bookmarks.filter(({type}) => BookmarkTypeEnum.isFolder(type)));
+            const foldersAndBookmark = this.#groupByBookmarks(bookmarks);
 
-            console.debug('Bookmark folders to recreate', bookmarkFoldersOnly);
+            console.debug('Bookmark folders and bookmarks to recreate', foldersAndBookmark);
 
-            await Promise.allSettled(this.#bookmarksToRecreateBookmarks(bookmarkFoldersOnly));
+            console.debug('Bookmark folders to recreate', foldersAndBookmark.foldersOnly);
 
-            const bookmarksOnly = bookmarks
-                .map(bookmarks => bookmarks.filter(({type}) => !BookmarkTypeEnum.isFolder(type)));
+            for (const createOperations of this.#bookmarksToRecreateBookmarks(foldersAndBookmark.foldersOnly)) {
+                const {parentId} = await Promise.allSettled(createOperations);
+            }
 
-            console.debug('Bookmarks to recreate', bookmarksOnly);
+            console.debug('Bookmarks to recreate', foldersAndBookmark.bookmarksOnly);
 
-            await Promise.allSettled(this.#bookmarksToRecreateBookmarks(bookmarksOnly));
+            for await (const createOperations of this.#bookmarksToRecreateBookmarks(foldersAndBookmark.bookmarksOnly)) {
+                await Promise.allSettled(createOperations)
+            }
 
             console.debug('Recreation is started. Bookmark type is folder ended');
         } else {
@@ -121,10 +123,36 @@ export default class PreventBookmarkRemoval {
         await this.#storage.delete(id);
     }
 
-    #bookmarksToRecreateBookmarks(bookmars) {
-        return bookmars
-            .map(bookmars => bookmars.map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark)))
-            .map(async bookmarks => await Promise.allSettled(bookmarks));
+    #groupByBookmarks(bookmarkArrays) {
+        const foldersOnly = [];
+        const bookmarksOnly = [];
+
+        bookmarkArrays.forEach(bookmarkArray => {
+            const foundFoldersOnly = [];
+            const foundBookmarksOnly = [];
+
+            bookmarkArray.forEach(bookmark => {
+                if (BookmarkTypeEnum.isFolder(bookmark.type)) {
+                    foundFoldersOnly.push(bookmark);
+                } else {
+                    foundBookmarksOnly.push(bookmark);
+                }
+            });
+
+            if (foundFoldersOnly.length > 0) {
+                foldersOnly.push(foundFoldersOnly);
+            }
+            if (foundBookmarksOnly.length > 0) {
+                bookmarksOnly.push(foundBookmarksOnly);
+            }
+        })
+
+        return {foldersOnly, bookmarksOnly};
+    }
+
+    #bookmarksToRecreateBookmarks(bookmarkArrays) {
+        return bookmarkArrays
+            .map(bookmarkArray => bookmarkArray.map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark)));
     }
 
     async destroy() {

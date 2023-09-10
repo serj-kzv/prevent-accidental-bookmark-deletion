@@ -29,7 +29,7 @@ export default class BookmarkStorage {
     getChildrenRecursiveById(id) {
         const bookmark = this.get(id);
 
-        return this.#getChildrenRecursiveByParentId([bookmark], [bookmark]);
+        return this.#getChildrenRecursiveByParentId([bookmark], [[bookmark]]);
     }
 
     #getChildrenRecursiveByParentId(children, result = []) {
