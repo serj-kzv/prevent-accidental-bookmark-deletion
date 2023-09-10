@@ -98,7 +98,7 @@ export default class PreventBookmarkRemoval {
             console.debug('Bookmark folders to recreate', foldersAndBookmark.foldersOnly);
 
             for (const createOperations of this.#bookmarksToRecreateBookmarks(foldersAndBookmark.foldersOnly)) {
-                const {parentId} = await Promise.allSettled(createOperations);
+                const {id, oldId} = await Promise.allSettled(createOperations);
             }
 
             console.debug('Bookmarks to recreate', foldersAndBookmark.bookmarksOnly);
@@ -151,7 +151,9 @@ export default class PreventBookmarkRemoval {
     }
 
     #bookmarksToRecreateBookmarks(bookmarkArrays) {
-        return bookmarkArrays
+        const recreateBookmarkOperation = bookmarkArrays[0].map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark));
+
+        return bookmarkArrays.slice(1, bookmarkArrays.length)
             .map(bookmarkArray => bookmarkArray.map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark)));
     }
 
