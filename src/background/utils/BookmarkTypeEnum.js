@@ -1,6 +1,7 @@
 class BookmarkTypeEnum {
     static BOOKMARK = 'bookmark';
     static FOLDER = 'folder';
+    static SEPARATOR = 'separator';
     static NONE = '';
 
     static isBookmark(type) {

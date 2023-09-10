@@ -16,6 +16,8 @@ class BookmarkStorage {
 
             this.#storage.set(id, bookmark);
         });
+        console.log('tree of bookmarks', await browser.bookmarks.getTree());
+        console.log('root of bookmarks', await browser.bookmarks.get(['root________']));
         console.debug('init storage state is', this.#storage);
     }
 
@@ -27,33 +29,18 @@ class BookmarkStorage {
         return this.#storage.get(id);
     }
 
-    getChildren(parentId) {
-        return this.getAll().find(({parentId: bookmarkParentId}) => parentId === bookmarkParentId);
-    }
-
     getChildrenRecursiveById(id) {
         const bookmark = this.get(id);
-        return this.getChildrenRecursiveByParentId(bookmark.parentId, [bookmark]);
+
+        return this.getChildrenRecursiveByParentId([bookmark]);
     }
 
-    getChildrenRecursiveByParentId(parentId, result = []) {
-        const that = this;
-        const bookmarks = this.getChildren(parentId);
+    getChildrenRecursiveByParentId(children, result = []) {
+        const bookmarkChildrenIds = children.map(({id}) => id);
+        const bookmarkChildren = this.getAll()
+            .filter(({parentId}) => bookmarkChildrenIds.includes(parentId));
 
-        if (bookmarkChildren.length < 1) {
-            result.push([bookmarks]);
-            return result;
-        }
-
-        const bookmarkChildren = bookmarks
-            .map(({parentId: bookmarkParentId}) => that.getChildrenRecursive(bookmarkParentId));
-
-        if (bookmarkChildren.length > 0) {
-            result.push([bookmarks, bookmarkChildren]);
-            return result;
-        }
-
-        result.push([bookmarks]);
+        result.push(bookmarkChildren);
 
         return result;
     }
