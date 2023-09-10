@@ -3,7 +3,7 @@ import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
 import BookmarkIdEnum from './utils/BookmarkIdEnum.js';
 import BookmarkValidator from './utils/BookmarkValidator.js';
 
-class PreventBookmarkRemoval {
+export default class PreventBookmarkRemoval {
     #storage;
     #bookmarkCreator = new BookmarkCreator();
     #onRemovedListener;
@@ -19,23 +19,24 @@ class PreventBookmarkRemoval {
     }
 
     async #init() {
-        console.log('tree of bookmarks', await browser.bookmarks.getTree());
-        console.log('root of bookmarks', await browser.bookmarks.get([BookmarkIdEnum.BOOKMARK_ROOT_ID]));
+        console.debug('start PreventBookmarkRemoval initialization starts');
 
         console.debug('start PreventBookmarkRemoval validation starts');
         await BookmarkValidator.validate();
         console.debug('start PreventBookmarkRemoval validation ended');
 
-        console.debug('start PreventBookmarkRemoval initialization starts');
-
         const bookmarks = await browser.bookmarks.search({});
         console.debug('Non root bookmarks', bookmarks);
 
+        console.debug('start PreventBookmarkRemoval storage initialization starts');
         this.#storage = await BookmarkStorage.build(bookmarks);
+        onsole.debug('start PreventBookmarkRemoval storage initialized');
+
+        console.debug('start PreventBookmarkRemoval listeners initialization starts');
         await this.#initOnCreatedListener();
         await this.#initOnChangedListener();
         await this.#initOnRemovedListener();
-        console.debug('start PreventBookmarkRemoval initialized');
+        console.debug('start PreventBookmarkRemoval listeners initialized');
     }
 
     async #initOnCreatedListener() {
@@ -102,5 +103,3 @@ class PreventBookmarkRemoval {
         this.#storage = undefined;
     }
 }
-
-export default PreventBookmarkRemoval;
