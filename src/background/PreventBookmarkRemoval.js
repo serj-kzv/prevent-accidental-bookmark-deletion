@@ -1,5 +1,6 @@
 import BookmarkCreator from "./BookmarkCreator.js";
 import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
+import BookmarkTypeEnum from './utils/BookmarkTypeEnum.js';
 import BookmarkValidator from './utils/BookmarkValidator.js';
 
 export default class PreventBookmarkRemoval {
@@ -29,13 +30,15 @@ export default class PreventBookmarkRemoval {
 
         console.debug('start PreventBookmarkRemoval storage initialization starts');
         this.#storage = await BookmarkStorage.build(bookmarks);
-        onsole.debug('start PreventBookmarkRemoval storage initialized');
+        console.debug('start PreventBookmarkRemoval storage initialized');
 
         console.debug('start PreventBookmarkRemoval listeners initialization starts');
         await this.#initOnCreatedListener();
         await this.#initOnChangedListener();
         await this.#initOnRemovedListener();
         console.debug('start PreventBookmarkRemoval listeners initialized');
+
+        console.debug('start PreventBookmarkRemoval initialized');
     }
 
     async #initOnCreatedListener() {
@@ -81,13 +84,45 @@ export default class PreventBookmarkRemoval {
         console.debug('parentId', parentId);
         console.debug('node', node);
 
-        const bookmark = await this.#storage.get(id);
+        if (BookmarkTypeEnum.isFolder(node.type)) {
+            console.debug('Recreation is started. Bookmark type is folder starts');
 
-        console.debug('index', index);
-        console.debug('bookmark', bookmark);
+            const bookmarks = await this.#storage.getChildrenRecursiveById(id);
+
+            const bookmarkFoldersOnly = bookmarks
+                .forEach(bookmarks => bookmarks.filter(({type}) => BookmarkTypeEnum.isFolder(type)));
+
+            console.debug('Recreation is started. Bookmark type is folder starts. Bookmarks folder to recreate', bookmarkFoldersOnly);
+
+            await Promise.allSettled(this.#bookmarksToRecreateBookmarks(bookmarkFoldersOnly));
+
+            const bookmarksOnly = bookmarks
+                .forEach(bookmarks => bookmarks.filter(({type}) => !BookmarkTypeEnum.isFolder(type)));
+
+            console.debug('Recreation is started. Bookmark type is folder starts. Bookmarks to recreate', bookmarksOnly);
+
+            await Promise.allSettled(this.#bookmarksToRecreateBookmarks(bookmarksOnly));
+
+            console.debug('Recreation is started. Bookmark type is folder ended');
+        } else {
+            console.debug('Recreation is started. Bookmark type is not folder starts');
+
+            const bookmark = await this.#storage.get(id);
+
+            console.debug('bookmark will be recreated', bookmark);
+
+            await this.#bookmarkCreator.create(index, bookmark);
+
+            console.debug('Recreation is started. Bookmark type is not folder ended');
+        }
 
         await this.#storage.delete(id);
-        this.#bookmarkCreator.create(index, bookmark);
+    }
+
+    #bookmarksToRecreateBookmarks(bookmars) {
+        return bookmars
+            .map(bookmars => bookmars.map(async bookmark => await this.#bookmarkCreator.create(bookmark.index, bookmark)))
+            .map(async bookmarks => await Promise.allSettled(bookmarks));
     }
 
     async destroy() {

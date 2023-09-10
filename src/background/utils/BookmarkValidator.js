@@ -5,14 +5,17 @@ import Utils from './Utils.js';
 export default class BookmarkValidator {
 
     static async validate() {
-        await Promise.allSettled([
+        const validatorResults = await Promise.allSettled([
             BookmarkValidator.validateIfThereIsBookmarkTree(),
             BookmarkValidator.validateIfThereIsAtLeastBookmarkRoot(),
             BookmarkValidator.validateIfThereIsOnlyOneBookmarkRoot(),
             BookmarkValidator.validateIfBookmarkRootHasAnId(),
             BookmarkValidator.validateIfBookmarkRootHasValidId(),
+            BookmarkValidator.validateIfBookmarksHaveTypes(),
             BookmarkValidator.validateIfBookmarksHaveOnlyValidTypes(),
         ]);
+
+        return validatorResults.every(validatorResult => validatorResult === true);
     }
 
     static async validateIfThereIsBookmarkTree() {
@@ -21,9 +24,12 @@ export default class BookmarkValidator {
 
         if (isValid) {
             console.debug('There is bookmarkTree', bookmarkTree);
-        } else {
-            console.error('There is no bookmarkTree');
+
+            return true;
         }
+
+        console.error('There is no bookmarkTree');
+        return false;
     }
 
     static async validateIfThereIsAtLeastBookmarkRoot() {
@@ -31,11 +37,14 @@ export default class BookmarkValidator {
         const isValid = bookmarkTree.length > 0;
 
         if (isValid) {
-            console.debug('There is bookmark root or roots');
-        } else {
-            console.error('There is no bookmark root or roots');
+            console.debug('There is bookmark root or roots', bookmarkTree);
+
+            return true;
         }
 
+        console.error('There is no bookmark root or roots');
+
+        return false;
     }
 
     static async validateIfThereIsOnlyOneBookmarkRoot() {
@@ -44,9 +53,13 @@ export default class BookmarkValidator {
 
         if (isValid) {
             console.debug('There is only one bookmark root');
-        } else {
-            console.error('There is more then one bookmark root');
+
+            return true;
         }
+
+        console.error('There is more then one bookmark root');
+
+        return false;
     }
 
     static async validateIfBookmarkRootHasAnId() {
@@ -56,9 +69,13 @@ export default class BookmarkValidator {
 
         if (isValid) {
             console.debug('There is root bookmark id', rootBookmark);
-        } else {
-            console.error('There is no root bookmark id');
+
+            return true;
         }
+
+        console.error('There is no root bookmark id');
+
+        return false;
     }
 
     static async validateIfBookmarkRootHasValidId() {
@@ -68,24 +85,53 @@ export default class BookmarkValidator {
 
         if (isValid) {
             console.debug('root bookmark has valid id', rootBookmark);
-        } else {
-            console.error('root bookmark has not valid id');
+
+            return true;
         }
+
+        console.error('root bookmark has not valid id');
+
+        return false;
+    }
+
+    static async validateIfBookmarksHaveTypes() {
+        const bookmarks = (await browser.bookmarks.search({})).map(({type}) => type);
+        const rootBookmark = (await browser.bookmarks.getTree())[0];
+
+        bookmarks.push(rootBookmark);
+
+        const bookmarksWithoutTypes = bookmarks.filter(({type}) => Utils.isUndefinedOrNull(type));
+        const isValid = bookmarksWithoutTypes.length > 0;
+
+        if (isValid) {
+            console.debug('There are no bookmarks without types');
+
+            return true;
+        }
+
+        console.error('There are bookmarks without types', bookmarksWithoutTypes);
+
+        return false;
     }
 
     static async validateIfBookmarksHaveOnlyValidTypes() {
-        const types = (await browser.bookmarks.search({})).map(({type}) => type);
-        const {type} = (await browser.bookmarks.getTree())[0];
+        const bookmarks = (await browser.bookmarks.search({}));
+        const rootBookmark = (await browser.bookmarks.getTree())[0];
 
-        types.push(type);
+        bookmarks.push(rootBookmark);
 
-        const isNotValidTypes = types.filter(type => BookmarkTypeEnum.isNotValidType(type));
-        const isValid = isNotValidTypes.length < 1;
+        const bookmarksWithNotValidTypes = bookmarks.filter(({type}) => BookmarkTypeEnum.isNotValidType(type));
+        const isValid = bookmarksWithNotValidTypes.length < 1;
 
         if (isValid) {
             console.debug('bookmarks have valid types');
-        } else {
-            console.error('bookmarks have not valid types', isNotValidTypes);
+
+            return true;
         }
+
+        console.error('bookmarks have not valid types', bookmarksWithNotValidTypes);
+
+        return false;
     }
+
 }
