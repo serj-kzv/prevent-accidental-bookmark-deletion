@@ -17,8 +17,8 @@ export default class BookmarkTypeEnum {
 
     static isValidType(type) {
         return BookmarkTypeEnum.isBookmark(type)
-        || BookmarkTypeEnum.isFolder(type)
-        || BookmarkTypeEnum.isSeparator(type);
+            || BookmarkTypeEnum.isFolder(type)
+            || BookmarkTypeEnum.isSeparator(type);
     }
 
     static isNotValidType(type) {

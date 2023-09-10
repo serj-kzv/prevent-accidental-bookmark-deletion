@@ -1,6 +1,5 @@
 import BookmarkCreator from "./BookmarkCreator.js";
 import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
-import BookmarkIdEnum from './utils/BookmarkIdEnum.js';
 import BookmarkValidator from './utils/BookmarkValidator.js';
 
 export default class PreventBookmarkRemoval {

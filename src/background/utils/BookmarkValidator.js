@@ -1,6 +1,6 @@
+import BookmarkIdEnum from './BookmarkIdEnum.js';
 import BookmarkTypeEnum from './BookmarkTypeEnum.js';
 import Utils from './Utils.js';
-import BookmarkIdEnum from './BookmarkIdEnum.js';
 
 export default class BookmarkValidator {
 
