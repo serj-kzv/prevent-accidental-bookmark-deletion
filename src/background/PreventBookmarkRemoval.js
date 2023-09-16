@@ -62,7 +62,15 @@ export default class PreventBookmarkRemoval {
             console.debug('Will be changed in storage, parentId', parentId);
             console.debug('Will be changed in storage, id', id);
 
-            this.#storage.save(bookmark);
+            const savedBookmark = this.#storage.get(id);
+
+            console.debug('Will be changed in storage, savedBookmark', savedBookmark);
+
+            const changedBookmark = {...savedBookmark, ...bookmark};
+
+            console.debug('Will be changed in storage, changedBookmark', changedBookmark);
+
+            this.#storage.save(changedBookmark);
         };
         browser.bookmarks.onChanged.addListener(this.#onChangedListener);
     }
