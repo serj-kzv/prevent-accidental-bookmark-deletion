@@ -38,10 +38,12 @@ export default class PreventBookmarkRemoval {
         this.#storage = await BookmarkStorage.build(bookmarks);
         console.debug('start PreventBookmarkRemoval storage initialized');
 
-        this.#processors.push(await CreateBookmarkProcessor.build());
-        this.#processors.push(await ChangeBookmarkProcessor.build());
-        this.#processors.push(await MoveBookmarkProcessor.build());
-        this.#processors.push(await RemoveBookmarkProcessor.build());
+        this.#processors = [...await Promise.all([
+            CreateBookmarkProcessor.build(),
+            ChangeBookmarkProcessor.build(),
+            MoveBookmarkProcessor.build(),
+            RemoveBookmarkProcessor.build(),
+        ])];
 
         console.debug('start PreventBookmarkRemoval initialized');
     }
