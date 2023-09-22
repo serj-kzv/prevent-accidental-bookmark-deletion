@@ -17,9 +17,16 @@ export default class BookmarkValidator {
 
         console.debug('validatorResults', validatorResults);
 
+        const isValidatorsNotFinished = validatorResults
+            .some(({status}) => status === 'rejected');
+
+        if (isValidatorsNotFinished) {
+            return false;
+        }
+
         return validatorResults
             .map(({value}) => value)
-            .every(validatorResultValue => validatorResultValue === true);
+            .every(value => value === true);
     }
 
     static async validateIfThereIsBookmarkTree() {
