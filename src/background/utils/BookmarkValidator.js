@@ -15,7 +15,11 @@ export default class BookmarkValidator {
             BookmarkValidator.validateIfBookmarksHaveOnlyValidTypes(),
         ]);
 
-        return validatorResults.every(validatorResult => validatorResult === true);
+        console.debug('validatorResults', validatorResults);
+
+        return validatorResults
+            .map(({value}) => value)
+            .every(validatorResultValue => validatorResultValue === true);
     }
 
     static async validateIfThereIsBookmarkTree() {

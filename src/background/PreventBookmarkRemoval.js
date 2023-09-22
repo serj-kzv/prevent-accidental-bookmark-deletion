@@ -22,7 +22,11 @@ export default class PreventBookmarkRemoval {
         console.debug('start PreventBookmarkRemoval initialization starts');
 
         console.debug('start PreventBookmarkRemoval validation starts');
-        await BookmarkValidator.validate();
+        if (await BookmarkValidator.validate()) {
+            console.debug('Web Extension Bookmark API data is valid.');
+        } else {
+            console.error('Web Extension Bookmark API data is NOT valid.');
+        }
         console.debug('start PreventBookmarkRemoval validation ended');
 
         const bookmarks = await browser.bookmarks.search({});
@@ -79,12 +83,12 @@ export default class PreventBookmarkRemoval {
         const that = this;
 
         this.#onRemovedListener = async (id, {index, node}) => {
-            await that.#recreateBookmark(id, index, node);
+            await that.#recreateBookmarks(id, index, node);
         };
         browser.bookmarks.onRemoved.addListener(this.#onRemovedListener);
     }
 
-    async #recreateBookmark(id, index, node) {
+    async #recreateBookmarks(id, index, node) {
         const {parentId} = node;
 
         console.debug('Recreation is started.');
@@ -111,7 +115,13 @@ export default class PreventBookmarkRemoval {
 
             console.debug('Start bookmark recreation');
 
-            const recreatedBookmarks = await this.#makeRecreateOperations(foldersAndBookmark.bookmarksOnly);
+            const {currentNewIds} = recreatedFolders;
+
+            foldersAndBookmark.bookmarksOnly.flat(2)
+                .forEach(bookmark => bookmark.parentId = currentNewIds.get(bookmark.parentId));
+            foldersAndBookmark.bookmarksOnly.flat(2)
+                .map(bookmark => bookmark.id)
+                .map(bookmark => this.#recreateBookmark())
 
             console.debug('End bookmark recreation', recreatedBookmarks);
 
@@ -141,17 +151,21 @@ export default class PreventBookmarkRemoval {
 
             console.debug('Recreation is started. Bookmark type is folder ended');
         } else {
-            console.debug('Recreation is started. Bookmark type is not folder starts');
-
-            const bookmark = await this.#storage.get(id);
-
-            console.debug('bookmark will be recreated', bookmark);
-
-            await this.#bookmarkCreator.create(index, bookmark);
-            await this.#storage.delete(id);
-
-            console.debug('Recreation is started. Bookmark type is not folder ended');
+            await this.#recreateBookmark(id, index);
         }
+    }
+
+    async #recreateBookmark(id, index) {
+        console.debug('Recreation is started. Bookmark type is not folder starts');
+
+        const bookmark = await this.#storage.get(id);
+
+        console.debug('bookmark will be recreated', bookmark);
+
+        await this.#bookmarkCreator.create(index, bookmark);
+        await this.#storage.delete(id);
+
+        console.debug('Recreation is started. Bookmark type is not folder ended');
     }
 
     #groupByBookmarks(bookmarkArrays) {
@@ -222,7 +236,8 @@ export default class PreventBookmarkRemoval {
             }
         }
 
-        return [recreatedBookmark, ...recreatedBookmarks];
+        return [recreatedBookmark, ...recreatedBookmarks]
+            .map(bookmark => ({currentNewIds, bookmark}));
     }
 
     async destroy() {
