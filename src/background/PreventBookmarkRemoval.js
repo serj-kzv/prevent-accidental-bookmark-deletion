@@ -56,100 +56,25 @@ export default class PreventBookmarkRemoval {
         if (BookmarkTypeEnum.isFolder(node.type)) {
             console.debug('Recreation is started. Bookmark type is folder starts');
 
-            const bookmarks = this.#storage.getWithChildrenRecursiveById(id);
+            const folders = this.#storage.getFoldersWithChildrenRecursiveById(id);
+            const foldersIds = folders.flat(Infinity)
+                .map(id => id);
+            const bookmarks = this.#storage.getBookmarksByFolderIds(foldersIds);
 
-            console.debug('Recursive gotten bookmarks to recreate', bookmarks);
 
-            const foldersAndBookmark = this.#groupByBookmarks(bookmarks);
-
-            console.debug('Bookmark folders and bookmarks to recreate', foldersAndBookmark);
-
-            console.debug('Start bookmark folder recreation');
-
-            const recreatedFolders = await this.#makeRecreateOperations(foldersAndBookmark.foldersOnly);
-
-            console.debug('End bookmark folder recreation', recreatedFolders);
 
             console.debug('Start bookmark recreation');
 
-            const {currentNewIds} = recreatedFolders;
-
-            foldersAndBookmark.bookmarksOnly.flat(2)
-                .forEach(bookmark => bookmark.parentId = currentNewIds.get(bookmark.parentId));
-            foldersAndBookmark.bookmarksOnly.flat(2)
-                .map(bookmark => bookmark.id)
-                .map(bookmark => this.#recreateBookmark())
-
-            console.debug('End bookmark recreation', recreatedBookmarks);
-
-            console.debug('Start bookmark folder storage clearing', this.#storage);
-
-            const bookmarkFolderIdsToClear = recreatedFolders
-                .flat()
-                .map(({bookmark, oldId}) => oldId);
-
-            console.debug('Bookmark folders to be cleared', bookmarkFolderIdsToClear)
-
-            await Promise.all(bookmarkFolderIdsToClear.map(async id => await this.#storage.delete(id)));
-
-            console.debug('End bookmark folder storage clearing', this.#storage);
-
-            console.debug('Start bookmark storage clearing', this.#storage);
-
-            const bookmarkIdsToClear = recreatedBookmarks
-                .flat()
-                .map(({bookmark, oldId}) => oldId);
-
-            console.debug('Bookmarks to be cleared', bookmarkIdsToClear)
-
-            await Promise.all(bookmarkIdsToClear.map(async id => await this.#storage.delete(id)));
 
             console.debug('End bookmark storage clearing', this.#storage);
 
             console.debug('Recreation is started. Bookmark type is folder ended');
         } else {
-            await this.#recreateBookmark(id, index);
+            const bookmark = await this.#storage.get(id);
+
+            await this.#bookmarkCreator.create(index, bookmark);
+            await this.#storage.delete(id);
         }
-    }
-
-    async #recreateBookmark(id, index) {
-        console.debug('Recreation is started. Bookmark type is not folder starts');
-
-        const bookmark = await this.#storage.get(id);
-
-        console.debug('bookmark will be recreated', bookmark);
-
-        await this.#bookmarkCreator.create(index, bookmark);
-        await this.#storage.delete(id);
-
-        console.debug('Recreation is started. Bookmark type is not folder ended');
-    }
-
-    #groupByBookmarks(bookmarkArrays) {
-        const foldersOnly = [];
-        const bookmarksOnly = [];
-
-        bookmarkArrays.forEach(bookmarkArray => {
-            const foundFoldersOnly = [];
-            const foundBookmarksOnly = [];
-
-            bookmarkArray.forEach(bookmark => {
-                if (BookmarkTypeEnum.isFolder(bookmark.type)) {
-                    foundFoldersOnly.push(bookmark);
-                } else {
-                    foundBookmarksOnly.push(bookmark);
-                }
-            });
-
-            if (foundFoldersOnly.length > 0) {
-                foldersOnly.push(foundFoldersOnly);
-            }
-            if (foundBookmarksOnly.length > 0) {
-                bookmarksOnly.push(foundBookmarksOnly);
-            }
-        });
-
-        return {foldersOnly, bookmarksOnly};
     }
 
     async #makeRecreateOperations(bookmarkArrays) {

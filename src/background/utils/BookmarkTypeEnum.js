@@ -11,6 +11,10 @@ export default class BookmarkTypeEnum {
         return BookmarkTypeEnum.FOLDER === type;
     }
 
+    static isNotFolder(type) {
+        return !BookmarkTypeEnum.isFolder(type);
+    }
+
     static isSeparator(type) {
         return BookmarkTypeEnum.SEPARATOR === type;
     }
