@@ -62,9 +62,9 @@ export default class PreventBookmarkRemoval {
 
             const folderArraysIds = folderArrays.flat(Infinity)
                 .map(id => id);
-            const bookmarks = this.#storage.getBookmarksByFolderIds(folderArraysIds);
-
             const recreatedFolders = await this.#makeRecreateOperations(folderArrays);
+            // const bookmarks = this.#storage.getBookmarksByFolderIds(folderArraysIds);
+
 
             console.debug('Start bookmark recreation');
 
@@ -80,25 +80,25 @@ export default class PreventBookmarkRemoval {
     }
 
     async #makeRecreateOperations(folderArrays) {
-        let oldIdNewIdMap;
-
         const recreatedFolderArrays = await Promise.all(folderArrays[0].map(async folder => [
             folder.id,
             await this.#bookmarkCreator.create(folder.index, folder)
         ]));
-        oldIdNewIdMap = new Map(recreatedFolderArrays);
+        let oldIdNewIdMap = new Map(recreatedFolderArrays);
 
         for (const folderArray of folderArrays.slice(1)) {
             const recreatedFolderArrays = await Promise.all(folderArray.map(async folder => {
-                const parentId = oldIdNewIdMap.get(folder.parentId);
+                const parentId = oldIdNewIdMap.get(folder.parentId).id;
 
                 return [
                     folder.id,
                     await this.#bookmarkCreator.create(folder.index, {...folder, parentId})
                 ];
             }));
-            oldIdNewIdMap = new Map(recreatedFolderArrays);
+            oldIdNewIdMap = new Map([...oldIdNewIdMap, ...recreatedFolderArrays]);
         }
+
+        return oldIdNewIdMap;
     }
 
     destroy() {
