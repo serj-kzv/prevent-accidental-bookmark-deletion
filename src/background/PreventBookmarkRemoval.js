@@ -1,15 +1,16 @@
 import BookmarkCreator from "./BookmarkCreator.js";
 import BookmarkStorage from "./bookmarkstorage/BookmarkStorage.js";
+import ChangeBookmarkProcessor from './processor/ChangeBookmarkProcessor.js';
+import CreateBookmarkProcessor from './processor/CreateBookmarkProcessor.js';
+import MoveBookmarkProcessor from './processor/MoveBookmarkProcessor.js';
+import RemoveBookmarkProcessor from './processor/RemoveBookmarkProcessor.js';
 import BookmarkTypeEnum from './utils/BookmarkTypeEnum.js';
 import BookmarkValidator from './utils/BookmarkValidator.js';
 
 export default class PreventBookmarkRemoval {
     #storage;
     #bookmarkCreator = new BookmarkCreator();
-    #onRemovedListener;
-    #onCreatedListener;
-    #onChangedListener;
-    #onMovedListener;
+    #processors = [];
 
     static async build() {
         const command = new PreventBookmarkRemoval();
@@ -37,72 +38,12 @@ export default class PreventBookmarkRemoval {
         this.#storage = await BookmarkStorage.build(bookmarks);
         console.debug('start PreventBookmarkRemoval storage initialized');
 
-        console.debug('start PreventBookmarkRemoval listeners initialization starts');
-        await this.#initOnCreatedListener();
-        await this.#initOnChangedListener();
-        await this.#initOnMovedListener();
-        await this.#initOnRemovedListener();
-        console.debug('start PreventBookmarkRemoval listeners initialized');
+        this.#processors.push(await CreateBookmarkProcessor.build());
+        this.#processors.push(await ChangeBookmarkProcessor.build());
+        this.#processors.push(await MoveBookmarkProcessor.build());
+        this.#processors.push(await RemoveBookmarkProcessor.build());
 
         console.debug('start PreventBookmarkRemoval initialized');
-    }
-
-    async #initOnCreatedListener() {
-        this.#onCreatedListener = async (id, bookmark) => {
-            const {parentId} = bookmark;
-
-            console.debug('Will be added to storage', {id, parentId, bookmark});
-
-            this.#storage.save(bookmark);
-        };
-        browser.bookmarks.onCreated.addListener(this.#onCreatedListener);
-    }
-
-    async #initOnChangedListener() {
-        this.#onChangedListener = async (id, bookmark) => {
-            const {parentId} = bookmark;
-
-            console.debug('Will be changed in storage', {id, parentId, bookmark});
-
-            const savedBookmark = this.#storage.get(id);
-
-            console.debug('Will be changed in storage, savedBookmark', savedBookmark);
-
-            const changedBookmark = {...savedBookmark, ...bookmark};
-
-            console.debug('Will be changed in storage, changedBookmark', changedBookmark);
-
-            this.#storage.save(changedBookmark);
-        };
-        browser.bookmarks.onChanged.addListener(this.#onChangedListener);
-    }
-
-    async #initOnMovedListener() {
-        this.#onMovedListener = async (id, moveInfo) => {
-            const {parentId, index} = moveInfo;
-
-            console.debug('Will be moved in storage', {id, moveInfo});
-
-            const savedBookmark = this.#storage.get(id);
-
-            console.debug('Will be moved in storage, savedBookmark', savedBookmark);
-
-            const movedBookmark = {...savedBookmark, parentId, index};
-
-            console.debug('Will be moved in storage, movedBookmark', movedBookmark);
-
-            this.#storage.save(movedBookmark);
-        };
-        browser.bookmarks.onMoved.addListener(this.#onMovedListener);
-    }
-
-    async #initOnRemovedListener() {
-        const that = this;
-
-        this.#onRemovedListener = async (id, {index, node}) => {
-            await that.#recreateBookmarks(id, index, node);
-        };
-        browser.bookmarks.onRemoved.addListener(this.#onRemovedListener);
     }
 
     async #recreateBookmarks(id, index, node) {
@@ -254,15 +195,8 @@ export default class PreventBookmarkRemoval {
             .map(bookmark => ({currentNewIds, bookmark}));
     }
 
-    async destroy() {
-        browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
-        browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
-        browser.bookmarks.onRemoved.removeListener(this.#onMovedListener);
-        browser.bookmarks.onRemoved.removeListener(this.#onRemovedListener);
-        this.#onCreatedListener = undefined;
-        this.#onChangedListener = undefined;
-        this.#onMovedListener = undefined;
-        this.#onRemovedListener = undefined;
+    destroy() {
+        this.#processors.forEach(processor => processor.destroy());
         this.#storage = undefined;
     }
 }
