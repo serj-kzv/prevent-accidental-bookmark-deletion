@@ -9,6 +9,7 @@ export default class PreventBookmarkRemoval {
     #onRemovedListener;
     #onCreatedListener;
     #onChangedListener;
+    #onMovedListener;
 
     static async build() {
         const command = new PreventBookmarkRemoval();
@@ -39,6 +40,7 @@ export default class PreventBookmarkRemoval {
         console.debug('start PreventBookmarkRemoval listeners initialization starts');
         await this.#initOnCreatedListener();
         await this.#initOnChangedListener();
+        await this.#initOnMovedListener();
         await this.#initOnRemovedListener();
         console.debug('start PreventBookmarkRemoval listeners initialized');
 
@@ -77,6 +79,26 @@ export default class PreventBookmarkRemoval {
             this.#storage.save(changedBookmark);
         };
         browser.bookmarks.onChanged.addListener(this.#onChangedListener);
+    }
+
+    async #initOnMovedListener() {
+        this.#onMovedListener = async (id, moveInfo) => {
+            const {parentId, index} = moveInfo;
+
+            console.debug('Will be moved in storage', moveInfo);
+            console.debug('Will be moved in storage, id', id);
+
+            const savedBookmark = this.#storage.get(id);
+
+            console.debug('Will be moved in storage, savedBookmark', savedBookmark);
+
+            const movedBookmark = {...savedBookmark, parentId, index};
+
+            console.debug('Will be moved in storage, changedBookmark', movedBookmark);
+
+            this.#storage.save(movedBookmark);
+        };
+        browser.bookmarks.onMoved.addListener(this.#onMovedListener);
     }
 
     async #initOnRemovedListener() {
