@@ -51,9 +51,7 @@ export default class PreventBookmarkRemoval {
         this.#onCreatedListener = async (id, bookmark) => {
             const {parentId} = bookmark;
 
-            console.debug('Will be added to storage', bookmark);
-            console.debug('Will be added to storage, parentId', parentId);
-            console.debug('Will be added to storage, id', id);
+            console.debug('Will be added to storage', {id, parentId, bookmark});
 
             this.#storage.save(bookmark);
         };
@@ -64,9 +62,7 @@ export default class PreventBookmarkRemoval {
         this.#onChangedListener = async (id, bookmark) => {
             const {parentId} = bookmark;
 
-            console.debug('Will be changed in storage', bookmark);
-            console.debug('Will be changed in storage, parentId', parentId);
-            console.debug('Will be changed in storage, id', id);
+            console.debug('Will be changed in storage', {id, parentId, bookmark});
 
             const savedBookmark = this.#storage.get(id);
 
@@ -85,8 +81,7 @@ export default class PreventBookmarkRemoval {
         this.#onMovedListener = async (id, moveInfo) => {
             const {parentId, index} = moveInfo;
 
-            console.debug('Will be moved in storage', moveInfo);
-            console.debug('Will be moved in storage, id', id);
+            console.debug('Will be moved in storage', {id, moveInfo});
 
             const savedBookmark = this.#storage.get(id);
 
@@ -113,10 +108,7 @@ export default class PreventBookmarkRemoval {
     async #recreateBookmarks(id, index, node) {
         const {parentId} = node;
 
-        console.debug('Recreation is started.');
-        console.debug('id', id);
-        console.debug('parentId', parentId);
-        console.debug('node', node);
+        console.debug('Recreation is started.', {id, parentId, node});
 
         if (BookmarkTypeEnum.isFolder(node.type)) {
             console.debug('Recreation is started. Bookmark type is folder starts');
