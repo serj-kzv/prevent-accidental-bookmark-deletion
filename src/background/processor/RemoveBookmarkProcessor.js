@@ -22,7 +22,7 @@ export default class RemoveBookmarkProcessor {
     async #init() {
         const that = this;
 
-        this.#onRemovedListener = async (id, {index, node}) => {
+        this.#listener = async (id, {index, node}) => {
             await that.#recreateBookmarks(id, index, node);
         };
         browser.bookmarks.onRemoved.addListener(this.#listener);
