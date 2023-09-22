@@ -94,7 +94,7 @@ export default class PreventBookmarkRemoval {
 
             const movedBookmark = {...savedBookmark, parentId, index};
 
-            console.debug('Will be moved in storage, changedBookmark', movedBookmark);
+            console.debug('Will be moved in storage, movedBookmark', movedBookmark);
 
             this.#storage.save(movedBookmark);
         };
@@ -263,13 +263,13 @@ export default class PreventBookmarkRemoval {
     }
 
     async destroy() {
-        if (this.#onRemovedListener) {
-            browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
-            browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
-            browser.bookmarks.onRemoved.removeListener(this.#onRemovedListener);
-        }
+        browser.bookmarks.onCreated.removeListener(this.#onCreatedListener);
+        browser.bookmarks.onChanged.removeListener(this.#onChangedListener);
+        browser.bookmarks.onRemoved.removeListener(this.#onMovedListener);
+        browser.bookmarks.onRemoved.removeListener(this.#onRemovedListener);
         this.#onCreatedListener = undefined;
         this.#onChangedListener = undefined;
+        this.#onMovedListener = undefined;
         this.#onRemovedListener = undefined;
         this.#storage = undefined;
     }
