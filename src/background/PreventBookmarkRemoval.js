@@ -56,7 +56,7 @@ export default class PreventBookmarkRemoval {
         if (BookmarkTypeEnum.isFolder(node.type)) {
             console.debug('Recreation is started. Bookmark type is folder starts');
 
-            const bookmarks = this.#storage.getChildrenRecursiveById(id);
+            const bookmarks = this.#storage.getWithChildrenRecursiveById(id);
 
             console.debug('Recursive gotten bookmarks to recreate', bookmarks);
 

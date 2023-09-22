@@ -26,13 +26,13 @@ export default class BookmarkStorage {
         return this.#storage.get(id);
     }
 
-    getChildrenRecursiveById(id) {
+    getWithChildrenRecursiveById(id) {
         const bookmark = this.get(id);
 
-        return this.#getChildrenRecursiveByParentId([bookmark], [[bookmark]]);
+        return this.#getWithChildrenRecursiveByParentId([bookmark], [[bookmark]]);
     }
 
-    #getChildrenRecursiveByParentId(children, result = []) {
+    #getWithChildrenRecursiveByParentId(children, result = []) {
         const bookmarkChildrenIds = children
             .filter(({type}) => BookmarkTypeEnum.isFolder(type))
             .map(({id}) => id);
@@ -46,7 +46,7 @@ export default class BookmarkStorage {
 
         result.push(bookmarkChildren);
 
-        return this.#getChildrenRecursiveByParentId(bookmarkChildren, result);
+        return this.#getWithChildrenRecursiveByParentId(bookmarkChildren, result);
     }
 
     save(bookmark) {
