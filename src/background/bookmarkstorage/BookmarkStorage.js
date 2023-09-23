@@ -42,6 +42,7 @@ export default class BookmarkStorage {
         }
 
         const bookmarkChildren = this.getAll()
+            .filter(({type}) => BookmarkTypeEnum.isFolder(type))
             .filter(({parentId}) => bookmarkChildrenIds.includes(parentId));
 
         result.push(bookmarkChildren);
