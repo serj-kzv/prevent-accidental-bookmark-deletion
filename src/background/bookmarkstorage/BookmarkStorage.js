@@ -68,6 +68,10 @@ export default class BookmarkStorage {
         return this.#storage.delete(id);
     }
 
+    deleteAllByIds(ids) {
+        return ids.map(id => this.#storage.delete(id));
+    }
+
     destroy() {
         this.#storage = undefined;
     }

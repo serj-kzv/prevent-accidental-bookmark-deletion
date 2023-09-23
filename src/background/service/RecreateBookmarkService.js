@@ -22,20 +22,30 @@ class RecreateBookmarkService {
 
             console.debug('recreatedFolderOldIds', recreatedFolderOldIds);
 
-            const bookmarksToRecreate = storage.getBookmarksByFolderIds(recreatedFolderOldIds)
+            const bookmarksToRecreate = storage.getBookmarksByFolderIds(recreatedFolderOldIds);
+
+            console.debug('bookmarksToRecreate', bookmarksToRecreate);
+
+            const bookmarksToRecreateOldIds = bookmarksToRecreate.map(({id}) => id);
+
+            console.debug('bookmarksToRecreateOldIds', bookmarksToRecreateOldIds);
+
+            const bookmarksToRecreateOperations = bookmarksToRecreate
                 .map(bookmark => {
                     const parentId = recreatedFoldersMap.get(bookmark.parentId).id;
                     return {...bookmark, parentId};
                 })
                 .map(bookmark => bookmarkCreatorService.create(bookmark.index, bookmark));
 
-            console.debug('bookmarksToRecreate', bookmarksToRecreate);
+            console.debug('bookmarksToRecreateOperations', bookmarksToRecreateOperations);
 
-            const recreatedBookmarks = await Promise.all(bookmarksToRecreate);
+            const recreatedBookmarks = await Promise.all(bookmarksToRecreateOperations);
 
             console.debug('recreatedBookmarks', recreatedBookmarks);
 
-            console.debug('Start bookmark recreation');
+            console.debug('Start bookmark storage clearing', storage);
+
+            storage.deleteAllByIds([...recreatedFolderOldIds, ...bookmarksToRecreateOldIds]);
 
             console.debug('End bookmark storage clearing', storage);
 
