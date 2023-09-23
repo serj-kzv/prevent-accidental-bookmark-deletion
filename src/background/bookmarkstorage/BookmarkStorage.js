@@ -45,6 +45,10 @@ export default class BookmarkStorage {
             .filter(({type}) => BookmarkTypeEnum.isFolder(type))
             .filter(({parentId}) => bookmarkChildrenIds.includes(parentId));
 
+        if (bookmarkChildren.length < 1) {
+            return result;
+        }
+
         result.push(bookmarkChildren);
 
         return this.#getFoldersWithChildrenRecursiveByParentId(bookmarkChildren, result);

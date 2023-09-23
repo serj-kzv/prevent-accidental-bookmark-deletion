@@ -22,13 +22,18 @@ class RecreateBookmarkService {
 
             console.debug('recreatedFolderOldIds', recreatedFolderOldIds);
 
-            // const bookmarksToRecreate = storage.getBookmarksByFolderIds(recreatedFolderOldIds)
-            //     .map(bookmark => {
-            //         const parentId = recreatedFoldersMap.get(bookmark.parentId);
-            //         return {...bookmark, parentId};
-            //     });
-            //
-            // console.debug('bookmarksToRecreate', bookmarksToRecreate);
+            const bookmarksToRecreate = storage.getBookmarksByFolderIds(recreatedFolderOldIds)
+                .map(bookmark => {
+                    const parentId = recreatedFoldersMap.get(bookmark.parentId).id;
+                    return {...bookmark, parentId};
+                })
+                .map(bookmark => bookmarkCreatorService.create(bookmark.index, bookmark));
+
+            console.debug('bookmarksToRecreate', bookmarksToRecreate);
+
+            const recreatedBookmarks = await Promise.all(bookmarksToRecreate);
+
+            console.debug('recreatedBookmarks', recreatedBookmarks);
 
             console.debug('Start bookmark recreation');
 
