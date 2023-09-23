@@ -1,4 +1,3 @@
-import BookmarkCreatorService from '../service/BookmarkCreatorService.js';
 import recreateBookmarkService from '../service/RecreateBookmarkService.js';
 
 export default class RemoveBookmarkProcessor {

@@ -15,15 +15,20 @@ class RecreateBookmarkService {
             console.debug('folderArrays', folderArrays);
 
             const recreatedFoldersMap = await this.#makeRecreateOperations(folderArrays);
+
             console.debug('recreatedFolders', recreatedFoldersMap);
 
-            const folderArraysIds = Array.from(recreatedFoldersMap.keys());
+            const recreatedFolderOldIds = Array.from(recreatedFoldersMap.keys());
 
-            console.debug('folderArraysIds', folderArraysIds);
+            console.debug('recreatedFolderOldIds', recreatedFolderOldIds);
 
-            const bookmarks = storage.getBookmarksByFolderIds(folderArraysIds);
-
-            console.debug('bookmarks to recreate', bookmarks);
+            // const bookmarksToRecreate = storage.getBookmarksByFolderIds(recreatedFolderOldIds)
+            //     .map(bookmark => {
+            //         const parentId = recreatedFoldersMap.get(bookmark.parentId);
+            //         return {...bookmark, parentId};
+            //     });
+            //
+            // console.debug('bookmarksToRecreate', bookmarksToRecreate);
 
             console.debug('Start bookmark recreation');
 
