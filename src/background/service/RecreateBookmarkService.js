@@ -14,7 +14,7 @@ class RecreateBookmarkService {
 
             console.debug('folderArrays', folderArrays);
 
-            const recreatedFoldersMap = await this.#makeRecreateOperations(folderArrays);
+            const recreatedFoldersMap = await this.#makeRecreateFolderOperations(folderArrays);
 
             console.debug('recreatedFolders', recreatedFoldersMap);
 
@@ -58,26 +58,26 @@ class RecreateBookmarkService {
         }
     }
 
-    async #makeRecreateOperations(folderArrays) {
+    async #makeRecreateFolderOperations(folderArrays) {
         const recreatedFolderArrays = await Promise.all(folderArrays[0].map(async folder => [
             folder.id,
             await bookmarkCreatorService.create(folder.index, folder)
         ]));
-        let oldIdNewIdMap = new Map(recreatedFolderArrays);
+        let oldIdFolderMap = new Map(recreatedFolderArrays);
 
         for (const folderArray of folderArrays.slice(1)) {
-            const recreatedFolderArrays = await Promise.all(folderArray.map(async folder => {
-                const parentId = oldIdNewIdMap.get(folder.parentId).id;
+            const recreatedOldIdFolderMap = await Promise.all(folderArray.map(async folder => {
+                const parentId = oldIdFolderMap.get(folder.parentId).id;
 
                 return [
                     folder.id,
                     await bookmarkCreatorService.create(folder.index, {...folder, parentId})
                 ];
             }));
-            oldIdNewIdMap = new Map([...oldIdNewIdMap, ...recreatedFolderArrays]);
+            oldIdFolderMap = new Map([...oldIdFolderMap, ...recreatedOldIdFolderMap]);
         }
 
-        return oldIdNewIdMap;
+        return oldIdFolderMap;
     }
 }
 
