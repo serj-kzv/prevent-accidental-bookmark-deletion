@@ -1,9 +1,7 @@
-class BookmarkCreator {
+class BookmarkCreatorService {
 
     async create(index, {id, parentId, type, url, title}) {
-        const bookmark = await this.#create(index, parentId, type, url, title);
-
-        return bookmark;
+        return await this.#create(index, parentId, type, url, title);
     }
 
     async #create(index, parentId, type, url, title) {
@@ -17,4 +15,6 @@ class BookmarkCreator {
     }
 }
 
-export default BookmarkCreator;
+const bookmarkCreatorService = new BookmarkCreatorService();
+
+export default bookmarkCreatorService;

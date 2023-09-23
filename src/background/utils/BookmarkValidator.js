@@ -1,5 +1,6 @@
 import BookmarkIdEnum from './BookmarkIdEnum.js';
 import BookmarkTypeEnum from './BookmarkTypeEnum.js';
+import PromiseStatusEnum from './PromiseStatusEnum.js';
 import Utils from './Utils.js';
 
 export default class BookmarkValidator {
@@ -18,7 +19,9 @@ export default class BookmarkValidator {
         console.debug('validatorResults', validatorResults);
 
         const isValidatorsNotFinished = validatorResults
-            .some(({status}) => status === 'rejected');
+            .some(({status}) => PromiseStatusEnum.isRejected(status));
+
+        console.debug('isValidatorsNotFinished', isValidatorsNotFinished);
 
         if (isValidatorsNotFinished) {
             return false;
