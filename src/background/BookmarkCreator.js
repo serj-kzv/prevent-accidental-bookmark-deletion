@@ -3,7 +3,7 @@ class BookmarkCreator {
     async create(index, {id, parentId, type, url, title}) {
         const bookmark = await this.#create(index, parentId, type, url, title);
 
-        return {bookmark, oldId: id};
+        return bookmark;
     }
 
     async #create(index, parentId, type, url, title) {
