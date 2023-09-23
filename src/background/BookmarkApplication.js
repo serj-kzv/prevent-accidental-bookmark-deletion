@@ -5,7 +5,7 @@ import MoveBookmarkProcessor from './processor/MoveBookmarkProcessor.js';
 import RemoveBookmarkProcessor from './processor/RemoveBookmarkProcessor.js';
 import BookmarkValidator from './utils/BookmarkValidator.js';
 
-export default class Main {
+export default class BookmarkApplication {
     #processors = [];
 
     async init() {
