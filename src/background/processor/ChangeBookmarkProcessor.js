@@ -7,18 +7,22 @@ export default class ChangeBookmarkProcessor extends BookmarkProcessor {
         super(browser.bookmarks.onChanged);
     }
 
-    async process({id, changeInfo}) {
-        console.debug('Will be changed in storage', {id, changeInfo});
+    async process({id, info}) {
+        console.log('ChangeBookmarkProcessor starts');
+
+        console.debug('Will be changed in storage', {id, info});
 
         const savedBookmark = bookmarkRepository.get(id);
 
         console.debug('Will be changed in storage, savedBookmark', savedBookmark);
 
-        const changedBookmark = {...savedBookmark, ...changeInfo};
+        const changedBookmark = {...savedBookmark, ...info};
 
         console.debug('Will be changed in storage, changedBookmark', changedBookmark);
 
         bookmarkRepository.save(changedBookmark);
+
+        console.log('ChangeBookmarkProcessor ends');
     }
 
 }

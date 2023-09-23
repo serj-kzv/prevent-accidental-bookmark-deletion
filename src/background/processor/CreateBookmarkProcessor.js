@@ -7,10 +7,14 @@ export default class CreateBookmarkProcessor extends BookmarkProcessor {
         super(browser.bookmarks.onCreated);
     }
 
-    async process({id, bookmark}) {
-        console.debug('Will be added to storage', {id, bookmark});
+    async process({id, info}) {
+        console.log('CreateBookmarkProcessor starts');
 
-        bookmarkRepository.save(bookmark);
+        console.debug('Will be added to storage', {id, info});
+
+        bookmarkRepository.save(info);
+
+        console.log('CreateBookmarkProcessor ends');
     }
 
 }

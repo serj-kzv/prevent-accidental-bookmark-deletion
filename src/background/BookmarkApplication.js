@@ -33,7 +33,7 @@ export default class BookmarkApplication {
             new RemoveBookmarkProcessor().init(),
         ])];
 
-        console.debug('start PreventBookmarkRemoval initialized');
+        console.debug('end PreventBookmarkRemoval initialized');
     }
 
     destroy() {

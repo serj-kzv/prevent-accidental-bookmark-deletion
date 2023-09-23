@@ -7,10 +7,12 @@ export default class MoveBookmarkProcessor extends BookmarkProcessor {
         super(browser.bookmarks.onMoved);
     }
 
-    async process({id, moveInfo}) {
-        console.debug('Will be moved in storage', {id, moveInfo});
+    async process({id, info}) {
+        console.log('MoveBookmarkProcessor starts');
 
-        const {parentId, index} = moveInfo;
+        console.debug('Will be moved in storage', {id, info});
+
+        const {parentId, index} = info;
 
         const savedBookmark = bookmarkRepository.get(id);
 
@@ -21,6 +23,8 @@ export default class MoveBookmarkProcessor extends BookmarkProcessor {
         console.debug('Will be moved in storage, movedBookmark', movedBookmark);
 
         bookmarkRepository.save(movedBookmark);
+
+        console.log('MoveBookmarkProcessor ends');
     }
 
 }
