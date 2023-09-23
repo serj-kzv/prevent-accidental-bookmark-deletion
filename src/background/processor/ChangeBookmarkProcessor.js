@@ -1,41 +1,24 @@
-export default class ChangeBookmarkProcessor {
-    #listener;
-    #storage;
+import bookmarkRepository from '../bookmarkstorage/BookmarkRepository.js';
+import BookmarkProcessor from './BookmarkProcessor.js';
+
+export default class ChangeBookmarkProcessor extends BookmarkProcessor {
 
     constructor(storage) {
-        this.#storage = storage;
+        super(browser.bookmarks.onChanged);
     }
 
-    static async build(storage) {
-        const processor = new ChangeBookmarkProcessor(storage);
+    async process({id, changeInfo}) {
+        console.debug('Will be changed in storage', {id, changeInfo});
 
-        await processor.#init();
+        const savedBookmark = bookmarkRepository.get(id);
 
-        return processor;
-    }
+        console.debug('Will be changed in storage, savedBookmark', savedBookmark);
 
-    destroy() {
-        browser.bookmarks.onChanged.removeListener(this.#listener);
-        this.#listener = undefined;
-    }
+        const changedBookmark = {...savedBookmark, ...changeInfo};
 
-    async #init() {
-        this.#listener = async (id, bookmark) => {
-            const {parentId} = bookmark;
+        console.debug('Will be changed in storage, changedBookmark', changedBookmark);
 
-            console.debug('Will be changed in storage', {id, parentId, bookmark});
-
-            const savedBookmark = this.#storage.get(id);
-
-            console.debug('Will be changed in storage, savedBookmark', savedBookmark);
-
-            const changedBookmark = {...savedBookmark, ...bookmark};
-
-            console.debug('Will be changed in storage, changedBookmark', changedBookmark);
-
-            this.#storage.save(changedBookmark);
-        };
-        browser.bookmarks.onChanged.addListener(this.#listener);
+        bookmarkRepository.save(changedBookmark);
     }
 
 }

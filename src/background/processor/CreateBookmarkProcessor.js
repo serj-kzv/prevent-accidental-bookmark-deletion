@@ -1,33 +1,16 @@
-export default class CreateBookmarkProcessor {
-    #listener;
-    #storage;
+import bookmarkRepository from '../bookmarkstorage/BookmarkRepository.js';
+import BookmarkProcessor from './BookmarkProcessor.js';
 
-    constructor(storage) {
-        this.#storage = storage;
+export default class CreateBookmarkProcessor extends BookmarkProcessor {
+
+    constructor() {
+        super(browser.bookmarks.onCreated);
     }
 
-    static async build(storage) {
-        const processor = new CreateBookmarkProcessor(storage);
+    async process({id, bookmark}) {
+        console.debug('Will be added to storage', {id, bookmark});
 
-        await processor.#init()
-
-        return processor;
-    }
-
-    destroy() {
-        browser.bookmarks.onCreated.removeListener(this.#listener);
-        this.#listener = undefined;
-    }
-
-    async #init() {
-        this.#listener = async (id, bookmark) => {
-            const {parentId} = bookmark;
-
-            console.debug('Will be added to storage', {id, parentId, bookmark});
-
-            this.#storage.save(bookmark);
-        };
-        browser.bookmarks.onCreated.addListener(this.#listener);
+        bookmarkRepository.save(bookmark);
     }
 
 }

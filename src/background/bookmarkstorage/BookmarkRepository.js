@@ -1,29 +1,24 @@
 import BookmarkTypeEnum from '../utils/BookmarkTypeEnum.js';
 
-export default class BookmarkStorage {
-    #storage;
+class BookmarkRepository {
+    #dataSource;
 
-    static async build(bookmarks) {
-        const storage = new BookmarkStorage();
-
-        await storage.#init(bookmarks);
-
-        return storage;
+    constructor() {
+        this.#dataSource = new Map();
     }
 
-    async #init(bookmarks) {
-        this.#storage = new Map();
-        bookmarks.forEach(bookmark => this.#storage.set(bookmark.id, bookmark));
+    saveAll(bookmarks) {
+        bookmarks.forEach(bookmark => this.#dataSource.set(bookmark.id, bookmark));
 
-        console.debug('init storage state is', this.#storage);
+        console.debug('init storage state is', this.#dataSource);
     }
 
     getAll() {
-        return Array.from(this.#storage.values());
+        return Array.from(this.#dataSource.values());
     }
 
     get(id) {
-        return this.#storage.get(id);
+        return this.#dataSource.get(id);
     }
 
     getFoldersWithChildrenRecursiveById(id) {
@@ -61,11 +56,11 @@ export default class BookmarkStorage {
     }
 
     save(bookmark) {
-        this.#storage.set(bookmark.id, bookmark);
+        this.#dataSource.set(bookmark.id, bookmark);
     }
 
     delete(id) {
-        return this.#storage.delete(id);
+        return this.#dataSource.delete(id);
     }
 
     deleteAllByIds(ids) {
@@ -73,7 +68,11 @@ export default class BookmarkStorage {
     }
 
     destroy() {
-        this.#storage = undefined;
+        this.#dataSource = undefined;
     }
 
 }
+
+const bookmarkRepository = new BookmarkRepository();
+
+export default bookmarkRepository;

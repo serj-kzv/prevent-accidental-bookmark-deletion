@@ -1,8 +1,10 @@
+import bookmarkRepository from '../bookmarkstorage/BookmarkRepository.js';
 import BookmarkTypeEnum from '../utils/BookmarkTypeEnum.js';
 import bookmarkCreatorService from './BookmarkCreatorService.js';
 
 class RecreateBookmarkService {
-    async recreateBookmarks(storage, id, index, node) {
+
+    async recreateBookmarks(id, index, node) {
         const {parentId} = node;
 
         console.debug('Recreation is started.', {id, parentId, node});
@@ -10,7 +12,7 @@ class RecreateBookmarkService {
         if (BookmarkTypeEnum.isFolder(node.type)) {
             console.debug('Recreation is started. Bookmark type is folder starts');
 
-            const folderArrays = storage.getFoldersWithChildrenRecursiveById(id);
+            const folderArrays = bookmarkRepository.getFoldersWithChildrenRecursiveById(id);
 
             console.debug('folderArrays', folderArrays);
 
@@ -22,7 +24,7 @@ class RecreateBookmarkService {
 
             console.debug('recreatedFolderOldIds', recreatedFolderOldIds);
 
-            const bookmarksToRecreate = storage.getBookmarksByFolderIds(recreatedFolderOldIds);
+            const bookmarksToRecreate = bookmarkRepository.getBookmarksByFolderIds(recreatedFolderOldIds);
 
             console.debug('bookmarksToRecreate', bookmarksToRecreate);
 
@@ -43,18 +45,18 @@ class RecreateBookmarkService {
 
             console.debug('recreatedBookmarks', recreatedBookmarks);
 
-            console.debug('Start bookmark storage clearing', storage);
+            console.debug('Start bookmark storage clearing', bookmarkRepository);
 
-            storage.deleteAllByIds([...recreatedFolderOldIds, ...bookmarksToRecreateOldIds]);
+            bookmarkRepository.deleteAllByIds([...recreatedFolderOldIds, ...bookmarksToRecreateOldIds]);
 
-            console.debug('End bookmark storage clearing', storage);
+            console.debug('End bookmark storage clearing', bookmarkRepository);
 
             console.debug('Recreation is started. Bookmark type is folder ended');
         } else {
-            const bookmark = await storage.get(id);
+            const bookmark = await bookmarkRepository.get(id);
 
             await bookmarkCreatorService.create(index, bookmark);
-            await storage.delete(id);
+            await bookmarkRepository.delete(id);
         }
     }
 
@@ -79,6 +81,7 @@ class RecreateBookmarkService {
 
         return oldIdFolderMap;
     }
+
 }
 
 const recreateBookmarkService = new RecreateBookmarkService();
