@@ -14,12 +14,16 @@ class RecreateBookmarkService {
 
             console.debug('folderArrays', folderArrays);
 
-            const folderArraysIds = folderArrays.flat(Infinity)
-                .map(id => id);
-            const recreatedFolders = await this.#makeRecreateOperations(folderArrays);
-            // const bookmarks = this.#storage.getBookmarksByFolderIds(folderArraysIds);
-            console.debug('recreatedFolders', recreatedFolders);
+            const recreatedFoldersMap = await this.#makeRecreateOperations(folderArrays);
+            console.debug('recreatedFolders', recreatedFoldersMap);
 
+            const folderArraysIds = Array.from(recreatedFoldersMap.keys());
+
+            console.debug('folderArraysIds', folderArraysIds);
+
+            const bookmarks = storage.getBookmarksByFolderIds(folderArraysIds);
+
+            console.debug('bookmarks to recreate', bookmarks);
 
             console.debug('Start bookmark recreation');
 
