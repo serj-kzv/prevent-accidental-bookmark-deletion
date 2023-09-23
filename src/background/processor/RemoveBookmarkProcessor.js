@@ -8,13 +8,13 @@ export default class RemoveBookmarkProcessor extends BookmarkProcessor {
     }
 
     async process({id, info}) {
-        console.log('RemoveBookmarkProcessor starts');
+        console.debug('RemoveBookmarkProcessor starts');
 
         const {index, node} = info;
 
         await recreateBookmarkService.recreateBookmarks(id, index, node);
 
-        console.log('RemoveBookmarkProcessor ends');
+        console.debug('RemoveBookmarkProcessor ends');
     }
 
 }

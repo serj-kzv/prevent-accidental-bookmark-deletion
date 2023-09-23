@@ -8,7 +8,7 @@ export default class ChangeBookmarkProcessor extends BookmarkProcessor {
     }
 
     async process({id, info}) {
-        console.log('ChangeBookmarkProcessor starts');
+        console.debug('ChangeBookmarkProcessor starts');
 
         console.debug('Will be changed in storage', {id, info});
 
@@ -22,7 +22,7 @@ export default class ChangeBookmarkProcessor extends BookmarkProcessor {
 
         bookmarkRepository.save(changedBookmark);
 
-        console.log('ChangeBookmarkProcessor ends');
+        console.debug('ChangeBookmarkProcessor ends');
     }
 
 }
