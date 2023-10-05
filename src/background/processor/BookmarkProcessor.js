@@ -16,7 +16,7 @@ export default class BookmarkProcessor {
     async init() {
         console.debug('BookmarkProcessor init', this.constructor.name);
 
-        this.#listener = async (id, info) => await this.process({id, info});
+        this.#listener = async (id = undefined, info = undefined) => await this.process({id, info});
         this.#event.addListener(this.#listener);
 
         return this;

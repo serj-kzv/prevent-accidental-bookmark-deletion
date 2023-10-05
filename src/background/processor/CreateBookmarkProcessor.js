@@ -12,7 +12,7 @@ export default class CreateBookmarkProcessor extends BookmarkProcessor {
 
         console.debug('Will be added to storage', {id, info});
 
-        bookmarkRepository.save(info);
+        await bookmarkRepository.save(info);
 
         console.debug('CreateBookmarkProcessor ends');
     }

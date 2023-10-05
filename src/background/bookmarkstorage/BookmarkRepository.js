@@ -4,30 +4,30 @@ class BookmarkRepository {
     #dataSource;
 
     constructor() {
-        this.#dataSource = new Map();
+        this.#dataSource = browser.storage.local;
     }
 
-    saveAll(bookmarks) {
-        bookmarks.forEach(bookmark => this.#dataSource.set(bookmark.id, bookmark));
+    async saveAll(bookmarks) {
+        const operations = bookmarks.map(bookmark => this.save(bookmark));
 
-        console.debug('init storage state is', this.#dataSource);
+        return await Promise.all(operations);
     }
 
     getAll() {
-        return Array.from(this.#dataSource.values());
+        return this.get();
     }
 
-    get(id) {
-        return this.#dataSource.get(id);
+    async get(ids) {
+        return Object.entries(await this.#dataSource.get(ids)).map(([key, value]) => value);
     }
 
-    getFoldersWithChildrenRecursiveById(id) {
-        const bookmark = this.get(id);
+    async getFoldersWithChildrenRecursiveById(id) {
+        const bookmark = await this.get(id);
 
-        return this.#getFoldersWithChildrenRecursiveByParentId([bookmark], [[bookmark]]);
+        return await this.#getFoldersWithChildrenRecursiveByParentId([bookmark], [[bookmark]]);
     }
 
-    #getFoldersWithChildrenRecursiveByParentId(children, result = []) {
+    async #getFoldersWithChildrenRecursiveByParentId(children, result = []) {
         const bookmarkChildrenIds = children
             .filter(({type}) => BookmarkTypeEnum.isFolder(type))
             .map(({id}) => id);
@@ -36,7 +36,7 @@ class BookmarkRepository {
             return result;
         }
 
-        const bookmarkChildren = this.getAll()
+        const bookmarkChildren = (await this.getAll())
             .filter(({type}) => BookmarkTypeEnum.isFolder(type))
             .filter(({parentId}) => bookmarkChildrenIds.includes(parentId));
 
@@ -46,25 +46,35 @@ class BookmarkRepository {
 
         result.push(bookmarkChildren);
 
-        return this.#getFoldersWithChildrenRecursiveByParentId(bookmarkChildren, result);
+        return await this.#getFoldersWithChildrenRecursiveByParentId(bookmarkChildren, result);
     }
 
-    getBookmarksByFolderIds(ids) {
-        return this.getAll()
+    async getBookmarksByFolderIds(ids) {
+        return (await this.getAll())
             .filter(({type}) => BookmarkTypeEnum.isNotFolder(type))
             .filter(({parentId}) => ids.includes(parentId));
     }
 
-    save(bookmark) {
-        this.#dataSource.set(bookmark.id, bookmark);
+    async save(bookmark) {
+        const item = Object.create(null);
+
+        item[`${bookmark.id}`] = bookmark;
+
+        await this.#dataSource.set(item);
+
+        return await this.get(bookmark.id);
     }
 
-    delete(id) {
-        return this.#dataSource.delete(id);
+    async delete(id) {
+        await this.#dataSource.remove(id);
+
+        return await this.get(id);
     }
 
-    deleteAllByIds(ids) {
-        return ids.map(id => this.delete(id));
+    async deleteAllByIds(ids) {
+        const operations = ids.map(id => this.delete(id));
+
+        return await Promise.all(operations);
     }
 
     destroy() {

@@ -3,7 +3,7 @@ import BookmarkProcessor from './BookmarkProcessor.js';
 
 export default class MoveBookmarkProcessor extends BookmarkProcessor {
 
-    constructor(storage) {
+    constructor() {
         super(browser.bookmarks.onMoved);
     }
 
@@ -14,7 +14,7 @@ export default class MoveBookmarkProcessor extends BookmarkProcessor {
 
         const {parentId, index} = info;
 
-        const savedBookmark = bookmarkRepository.get(id);
+        const savedBookmark = await bookmarkRepository.get(id);
 
         console.debug('Will be moved in storage, savedBookmark', savedBookmark);
 
@@ -22,7 +22,7 @@ export default class MoveBookmarkProcessor extends BookmarkProcessor {
 
         console.debug('Will be moved in storage, movedBookmark', movedBookmark);
 
-        bookmarkRepository.save(movedBookmark);
+        await bookmarkRepository.save(movedBookmark);
 
         console.debug('MoveBookmarkProcessor ends');
     }

@@ -10,9 +10,9 @@ class RecreateBookmarkService {
         console.debug('Recreation is started.', {id, parentId, node});
 
         if (BookmarkTypeEnum.isFolder(node.type)) {
-            console.debug('Recreation is started. Bookmark type is folder starts');
+            console.debug('Recreation is started. Bookmark type is folder starts. Storage state:', await bookmarkRepository.getAll());
 
-            const folderArrays = bookmarkRepository.getFoldersWithChildrenRecursiveById(id);
+            const folderArrays = await bookmarkRepository.getFoldersWithChildrenRecursiveById(id);
 
             console.debug('folderArrays', folderArrays);
 
@@ -24,7 +24,7 @@ class RecreateBookmarkService {
 
             console.debug('recreatedFolderOldIds', recreatedFolderOldIds);
 
-            const bookmarksToRecreate = bookmarkRepository.getBookmarksByFolderIds(recreatedFolderOldIds);
+            const bookmarksToRecreate = await bookmarkRepository.getBookmarksByFolderIds(recreatedFolderOldIds);
 
             console.debug('bookmarksToRecreate', bookmarksToRecreate);
 
@@ -47,7 +47,7 @@ class RecreateBookmarkService {
 
             console.debug('Start bookmark storage clearing', bookmarkRepository);
 
-            bookmarkRepository.deleteAllByIds([...recreatedFolderOldIds, ...bookmarksToRecreateOldIds]);
+            await bookmarkRepository.deleteAllByIds([...recreatedFolderOldIds, ...bookmarksToRecreateOldIds]);
 
             console.debug('End bookmark storage clearing', bookmarkRepository);
 

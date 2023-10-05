@@ -3,7 +3,7 @@ import BookmarkProcessor from './BookmarkProcessor.js';
 
 export default class ChangeBookmarkProcessor extends BookmarkProcessor {
 
-    constructor(storage) {
+    constructor() {
         super(browser.bookmarks.onChanged);
     }
 
@@ -12,7 +12,7 @@ export default class ChangeBookmarkProcessor extends BookmarkProcessor {
 
         console.debug('Will be changed in storage', {id, info});
 
-        const savedBookmark = bookmarkRepository.get(id);
+        const savedBookmark = await bookmarkRepository.get(id);
 
         console.debug('Will be changed in storage, savedBookmark', savedBookmark);
 
@@ -20,7 +20,7 @@ export default class ChangeBookmarkProcessor extends BookmarkProcessor {
 
         console.debug('Will be changed in storage, changedBookmark', changedBookmark);
 
-        bookmarkRepository.save(changedBookmark);
+        await bookmarkRepository.save(changedBookmark);
 
         console.debug('ChangeBookmarkProcessor ends');
     }
