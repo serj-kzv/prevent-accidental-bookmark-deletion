@@ -1,4 +1,4 @@
-import BookmarkValidator from '../utils/BookmarkValidator.js';
+import bookmarkInitService from '../service/BookmarkInitService.js';
 import BookmarkProcessor from './BookmarkProcessor.js';
 
 export default class OnInstalledBookmarkProcessor extends BookmarkProcessor {
@@ -9,6 +9,8 @@ export default class OnInstalledBookmarkProcessor extends BookmarkProcessor {
 
     async process() {
         console.debug('OnInstalledBookmarkProcessor starts');
+
+        await bookmarkInitService.initBookmarks();
 
         console.debug('OnInstalledBookmarkProcessor ends');
     }

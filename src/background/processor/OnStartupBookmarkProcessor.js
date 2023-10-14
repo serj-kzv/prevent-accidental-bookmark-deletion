@@ -1,3 +1,5 @@
+import bookmarkRepository from '../bookmarkstorage/BookmarkRepository.js';
+import bookmarkInitService from '../service/BookmarkInitService.js';
 import BookmarkProcessor from './BookmarkProcessor.js';
 
 export default class OnStartupBookmarkProcessor extends BookmarkProcessor {
@@ -9,7 +11,7 @@ export default class OnStartupBookmarkProcessor extends BookmarkProcessor {
     async process() {
         console.debug('OnStartupBookmarkProcessor starts');
 
-
+        await bookmarkInitService.initBookmarks();
 
         console.debug('OnStartupBookmarkProcessor ends');
     }
