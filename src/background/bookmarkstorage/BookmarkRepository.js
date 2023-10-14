@@ -18,7 +18,8 @@ class BookmarkRepository {
     }
 
     async get(ids) {
-        return Object.entries(await this.#dataSource.get(ids)).map(([key, value]) => value);
+        return Object.entries(await this.#dataSource.get(ids))
+            .map(([key, value]) => value);
     }
 
     async getFoldersWithChildrenRecursiveById(id) {
@@ -69,6 +70,13 @@ class BookmarkRepository {
         await this.#dataSource.remove(id);
 
         return await this.get(id);
+    }
+
+    async deleteAll() {
+        const itemIds = await this.getAll()
+            .map(({id}) => id);
+
+        return this.deleteAllByIds(itemIds);
     }
 
     async deleteAllByIds(ids) {

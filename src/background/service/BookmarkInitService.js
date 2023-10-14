@@ -4,6 +4,10 @@ class BookmarkInitService {
     async initBookmarks() {
         console.debug('start PreventBookmarkRemoval initialization starts', await browser.storage.local.get(null));
 
+        const deletedBookmarks = await bookmarkRepository.deleteAll();
+
+        console.debug('cleared bookmarks', deletedBookmarks);
+
         const bookmarks = await browser.bookmarks.search({});
         console.debug('Non root bookmarks', bookmarks);
 
