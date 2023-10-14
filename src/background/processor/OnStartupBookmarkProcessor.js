@@ -1,4 +1,3 @@
-import bookmarkRepository from '../bookmarkstorage/BookmarkRepository.js';
 import bookmarkInitService from '../service/BookmarkInitService.js';
 import BookmarkProcessor from './BookmarkProcessor.js';
 

@@ -1,5 +1,5 @@
 import bookmarkInitService from '../service/BookmarkInitService.js';
-import BookmarkValidator from '../utils/BookmarkValidator.js';
+import BookmarkValidatorExecutor from '../validator/BookmarkValidatorExecutor.js';
 import BookmarkProcessor from './BookmarkProcessor.js';
 
 export default class OnEnabledBookmarkProcessor extends BookmarkProcessor {
@@ -15,7 +15,7 @@ export default class OnEnabledBookmarkProcessor extends BookmarkProcessor {
         console.debug('OnEnabledBookmarkProcessor starts');
 
         console.debug('start PreventBookmarkRemoval validation starts');
-        if (await BookmarkValidator.validate()) {
+        if (await BookmarkValidatorExecutor.validate()) {
             console.debug('Web Extension Bookmark API data is valid.');
         } else {
             console.error('Web Extension Bookmark API data is NOT valid.');

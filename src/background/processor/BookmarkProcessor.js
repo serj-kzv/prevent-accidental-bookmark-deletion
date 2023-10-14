@@ -23,7 +23,7 @@ export default class BookmarkProcessor {
     }
 
     async process(data) {
-        console.debug('Method is not overridden.');
+        throw 'Method is not overridden.';
     }
 
 }
